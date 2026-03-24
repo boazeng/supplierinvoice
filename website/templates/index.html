@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>קליטת חשבוניות ספק</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1>קליטת חשבוניות ספק</h1>
+            <div class="header-actions">
+                <button id="btn-sync" class="btn btn-secondary" onclick="app.syncPriority()">
+                    סנכרון Priority
+                </button>
+                <span id="sync-status" class="sync-badge">לא סונכרן</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Upload Area — compact bar -->
+        <section class="upload-bar">
+            <div id="drop-zone" class="drop-zone-compact">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span>גרור חשבונית לכאן או</span>
+                <label class="btn btn-primary btn-sm upload-btn">
+                    בחר קובץ
+                    <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif" hidden>
+                </label>
+                <span class="drop-zone-hint">PDF, PNG, JPG, TIFF</span>
+            </div>
+        </section>
+
+        <!-- Status Filter Tabs -->
+        <section class="filter-tabs">
+            <button class="tab active" data-status="" onclick="app.filterByStatus(this, '')">הכל</button>
+            <button class="tab" data-status="review" onclick="app.filterByStatus(this, 'review')">ממתינות לבקרה</button>
+            <button class="tab" data-status="processing" onclick="app.filterByStatus(this, 'processing')">בעיבוד</button>
+            <button class="tab" data-status="submitted" onclick="app.filterByStatus(this, 'submitted')">נקלטו</button>
+            <button class="tab" data-status="rejected" onclick="app.filterByStatus(this, 'rejected')">נדחו</button>
+            <button class="tab" data-status="error" onclick="app.filterByStatus(this, 'error')">שגיאות</button>
+        </section>
+
+        <!-- Invoice Table -->
+        <section class="invoice-table-wrap">
+            <table class="invoice-table" id="invoice-table">
+                <thead>
+                    <tr>
+                        <th>שם ספק</th>
+                        <th>מס' חשבונית</th>
+                        <th>סה"כ לפני מע"מ</th>
+                        <th>סה"כ כולל מע"מ</th>
+                        <th>תאריך העלאה</th>
+                        <th>סטטוס</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="invoice-list">
+                    <tr><td colspan="7" class="empty-state">אין חשבוניות להצגה</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Invoice Detail Modal -->
+        <div id="invoice-modal" class="modal" style="display:none;">
+            <div class="modal-overlay" onclick="app.closeModal()"></div>
+            <div class="modal-content" id="modal-content">
+                <div class="modal-toolbar">
+                    <h3 style="font-size:0.95rem;font-weight:600;margin:0">פרטי חשבונית</h3>
+                    <div style="display:flex;align-items:center;gap:6px">
+                        <button class="btn-expand" onclick="app.toggleFullscreen()" title="הגדל/הקטן מסך">
+                            <span id="expand-icon">⛶</span>
+                        </button>
+                        <button class="modal-close" onclick="app.closeModal()">&times;</button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <!-- Left: File Preview -->
+                    <div class="preview-pane" id="preview-pane">
+                        <div class="preview-top-bar">
+                            <h3>קובץ מקור</h3>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <button class="btn btn-sm" style="background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)" onclick="app.testOcrCrop(app.activeHighlight)" id="btn-ocr-test">
+                                    🔍 קרא ספק
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="app.reextractInvoice()" id="btn-reextract">
+                                    🔄 פענוח חוזר
+                                </button>
+                                <span style="margin-right:auto"></span>
+                                <span id="sync-status-label" style="font-size:0.7rem;color:var(--text-muted)"></span>
+                                <button class="btn btn-sm" style="background:var(--success);color:white;border:none" onclick="app.syncWithPriority()" id="btn-sync">
+                                    🔄 סנכרן פריורטי
+                                </button>
+                            </div>
+                        </div>
+                        <div class="preview-container" id="preview-container">
+                            <iframe id="file-preview-iframe" class="file-preview" style="display:none"></iframe>
+                            <img id="file-preview-img" class="file-preview" style="display:none; object-fit:contain" />
+                            <!-- ריבוע כחול — ח.פ/ע.מ ספק -->
+                            <div id="highlight-box-supplier" class="highlight-box highlight-supplier" style="display:none" data-target="supplier">
+                                <div class="highlight-label">ח.פ / ע.מ ספק</div>
+                                <div class="resize-handle resize-handle-br"></div>
+                            </div>
+                            <!-- ריבוע אדום — ח.פ/ע.מ לקוח -->
+                            <div id="highlight-box-customer" class="highlight-box highlight-customer" style="display:none" data-target="customer">
+                                <div class="highlight-label">ח.פ / ע.מ לקוח</div>
+                                <div class="resize-handle resize-handle-br"></div>
+                            </div>
+                            <!-- ריבוע ירוק — מספר הקצאה -->
+                            <div id="highlight-box-allocation" class="highlight-box highlight-allocation" style="display:none" data-target="allocation">
+                                <div class="highlight-label">מספר הקצאה</div>
+                                <div class="resize-handle resize-handle-br"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Right: Extracted Data -->
+                    <div class="data-pane">
+                        <h3>נתונים שחולצו</h3>
+                        <div id="extracted-data"></div>
+
+                        <!-- Validation Warnings -->
+                        <div id="validation-warnings" class="warnings-box" style="display:none;">
+                            <h4>אזהרות</h4>
+                            <ul id="warnings-list"></ul>
+                        </div>
+
+                        <!-- User Notes -->
+                        <div class="notes-section">
+                            <label for="user-notes">הערות:</label>
+                            <textarea id="user-notes" rows="3" placeholder="הוסף הערות..."></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div id="action-buttons" class="action-buttons">
+                            <button class="btn btn-success" onclick="app.approveInvoice()">
+                                אשר וקלוט בפריורטי
+                            </button>
+                            <button class="btn btn-danger" onclick="app.rejectInvoice()">
+                                דחה
+                            </button>
+                            <button class="btn" style="background:var(--text-muted);color:white" onclick="app.deleteInvoice()">
+                                🗑 מחק
+                            </button>
+                        </div>
+
+                        <!-- Status Badge (for non-review invoices) -->
+                        <div id="status-display" class="status-display" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
