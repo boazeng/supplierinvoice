@@ -87,7 +87,7 @@ class PriorityClient:
         logger.info("מביא רשימת ספקים מפריורטי")
         result = await self._get(
             "SUPPLIERS",
-            params={"$select": "SUPNAME,SUPDES,WTAXNUM"},
+            params={"$select": "SUPNAME,SUPDES,VATNUM"},
         )
         return result.get("value", []) if result else []
 
