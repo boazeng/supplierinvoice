@@ -55,6 +55,12 @@ async def serve_spa():
     return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """סמל הלשונית — חשבונית (SVG)."""
+    return FileResponse(STATIC_DIR / "favicon.svg", media_type="image/svg+xml")
+
+
 @app.get("/api/health")
 async def health_check():
     """בדיקת תקינות השרת."""
