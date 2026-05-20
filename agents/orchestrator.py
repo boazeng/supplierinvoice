@@ -15,6 +15,51 @@ from database import db as companies_db
 logger = logging.getLogger("סוכן.תזמור")
 
 
+def enrich_invoice_from_db(invoice: Invoice) -> None:
+    """העשרת פרטי ספק ולקוח מ-DB לפי ח.פ/ע.מ — ממלא priority_supplier_code / priority_customer_code.
+
+    ניתן לקריאה גם מהפענוח הראשוני (Orchestrator) וגם מהפענוח החוזר (server.py).
+    """
+    data = invoice.extracted_data
+    if not data:
+        return
+
+    # העשרת ספק
+    if data.supplier and data.supplier.tax_id:
+        match = companies_db.find_by_tax_id(data.supplier.tax_id, "supplier")
+        if match:
+            logger.info("ספק נמצא ב-DB: %s (קוד %s)", match["name"], match["priority_code"])
+            data.supplier.name = match["name"]
+            data.supplier.priority_supplier_code = match["priority_code"]
+            data.supplier.priority_match_found = True
+            data.supplier.tax_id = match["tax_id"] or data.supplier.tax_id
+            if match.get("tax_id_type"):
+                data.supplier.tax_id_type = match["tax_id_type"]
+            if match.get("address"):
+                data.supplier.address = match["address"]
+
+    # העשרת לקוח
+    if data.customer and data.customer.tax_id:
+        match = companies_db.find_by_tax_id(data.customer.tax_id, "customer")
+        if not match:
+            match = companies_db.find_by_tax_id(data.customer.tax_id)
+        if match:
+            logger.info("לקוח נמצא ב-DB: %s (קוד %s)", match["name"], match["priority_code"])
+            data.customer.name = match["name"]
+            data.customer.priority_customer_code = match["priority_code"]
+            data.customer.priority_match_found = True
+            data.customer.tax_id = match["tax_id"] or data.customer.tax_id
+            if match.get("tax_id_type"):
+                data.customer.tax_id_type = match["tax_id_type"]
+            if match.get("address"):
+                data.customer.address = match["address"]
+            # חיפוש סניף
+            branch = companies_db.find_branch_by_tax_id(data.customer.tax_id)
+            if branch:
+                data.customer.branch = branch["branch_code"]
+                logger.info("סניף נמצא: %s (%s)", branch["branch_code"], branch["name"])
+
+
 class Orchestrator:
     """מנהל את זרימת העיבוד של חשבוניות."""
 
@@ -68,45 +113,8 @@ class Orchestrator:
         return invoice
 
     def _enrich_from_db(self, invoice: Invoice) -> None:
-        """העשרת פרטי ספק ולקוח מ-DB לפי ח.פ/ע.מ."""
-        data = invoice.extracted_data
-        if not data:
-            return
-
-        # העשרת ספק
-        if data.supplier and data.supplier.tax_id:
-            match = companies_db.find_by_tax_id(data.supplier.tax_id, "supplier")
-            if match:
-                logger.info("ספק נמצא ב-DB: %s (קוד %s)", match["name"], match["priority_code"])
-                data.supplier.name = match["name"]
-                data.supplier.priority_supplier_code = match["priority_code"]
-                data.supplier.priority_match_found = True
-                data.supplier.tax_id = match["tax_id"] or data.supplier.tax_id
-                if match.get("tax_id_type"):
-                    data.supplier.tax_id_type = match["tax_id_type"]
-                if match.get("address"):
-                    data.supplier.address = match["address"]
-
-        # העשרת לקוח
-        if data.customer and data.customer.tax_id:
-            match = companies_db.find_by_tax_id(data.customer.tax_id, "customer")
-            if not match:
-                match = companies_db.find_by_tax_id(data.customer.tax_id)
-            if match:
-                logger.info("לקוח נמצא ב-DB: %s (קוד %s)", match["name"], match["priority_code"])
-                data.customer.name = match["name"]
-                data.customer.priority_customer_code = match["priority_code"]
-                data.customer.priority_match_found = True
-                data.customer.tax_id = match["tax_id"] or data.customer.tax_id
-                if match.get("tax_id_type"):
-                    data.customer.tax_id_type = match["tax_id_type"]
-                if match.get("address"):
-                    data.customer.address = match["address"]
-                # חיפוש סניף
-                branch = companies_db.find_branch_by_tax_id(data.customer.tax_id)
-                if branch:
-                    data.customer.branch = branch["branch_code"]
-                    logger.info("סניף נמצא: %s (%s)", branch["branch_code"], branch["name"])
+        """העשרת פרטי ספק ולקוח מ-DB — מאציל לפונקציה המודולית."""
+        enrich_invoice_from_db(invoice)
 
     def start_background_processing(self, invoice_id: str) -> None:
         """מתחיל עיבוד ברקע — לשימוש מה-API."""

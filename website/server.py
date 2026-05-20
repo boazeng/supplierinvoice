@@ -323,6 +323,7 @@ async def reextract_invoice_api(invoice_id: str, body: dict = {}):
     """פענוח חוזר של חשבונית עם קואורדינטות אזור שסומן."""
     from agents.invoice_extractor import reextract_invoice
     from agents.data_validator import validate_invoice_data
+    from agents.orchestrator import enrich_invoice_from_db
 
     invoice = store.get(invoice_id)
     if not invoice:
@@ -337,6 +338,8 @@ async def reextract_invoice_api(invoice_id: str, body: dict = {}):
 
     try:
         invoice.extracted_data = await reextract_invoice(invoice.file_path, crop_coords)
+        # העשרת ספק/לקוח מ-DB → ממלא priority_supplier_code / priority_customer_code
+        enrich_invoice_from_db(invoice)
         invoice.priority_validation = await validate_invoice_data(
             invoice.extracted_data, priority_client
         )
