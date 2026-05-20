@@ -74,6 +74,14 @@ def init_db() -> None:
         )
     """)
     conn.execute("INSERT OR IGNORE INTO sync_status (id) VALUES (1)")
+    # טבלת חשבון הוצאות ברירת מחדל לכל ספק (נלמדת מהקלדות המשתמש)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS supplier_expense_accounts (
+            supplier_priority_code TEXT PRIMARY KEY,
+            expense_account TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
     conn.close()
     logger.info("בסיס הנתונים אותחל: %s", DB_PATH)
@@ -281,6 +289,37 @@ def get_all_branches() -> list[dict]:
     rows = conn.execute("SELECT * FROM branches ORDER BY name").fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+# --- חשבון הוצאות לפי ספק (נלמד מהקלדות) ---
+
+def get_supplier_expense_account(supplier_priority_code: str) -> Optional[str]:
+    """מחזיר את חשבון ההוצאות השמור לספק, או None."""
+    if not supplier_priority_code:
+        return None
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT expense_account FROM supplier_expense_accounts WHERE supplier_priority_code = ?",
+        (supplier_priority_code,),
+    ).fetchone()
+    conn.close()
+    return row["expense_account"] if row else None
+
+
+def set_supplier_expense_account(supplier_priority_code: str, expense_account: str) -> None:
+    """שומר/מעדכן חשבון הוצאות לספק. ערך ריק → לא נוגעים."""
+    if not supplier_priority_code or not expense_account:
+        return
+    conn = get_connection()
+    conn.execute("""
+        INSERT INTO supplier_expense_accounts (supplier_priority_code, expense_account, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(supplier_priority_code) DO UPDATE SET
+            expense_account = excluded.expense_account,
+            updated_at = CURRENT_TIMESTAMP
+    """, (supplier_priority_code, expense_account))
+    conn.commit()
+    conn.close()
 
 
 # --- סטטוס סנכרון ---

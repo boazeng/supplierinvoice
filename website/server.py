@@ -406,6 +406,14 @@ async def update_invoice_field(invoice_id: str, body: dict = {}):
         invoice.updated_at = datetime.now().isoformat()
         store.save(invoice)
         logger.info("שדה %s עודכן ל: %s", path, value)
+
+        # זיכרון לטווח ארוך — חשבון הוצאות לספק שיוצג אוטומטית בחשבוניות עתידיות שלו
+        if path == "expense_account" and invoice.extracted_data:
+            sup_code = invoice.extracted_data.supplier.priority_supplier_code
+            if sup_code and value:
+                companies_db.set_supplier_expense_account(sup_code, str(value))
+                logger.info("נשמר חשבון הוצאות %s לספק %s", value, sup_code)
+
         return {"ok": True, "path": path, "value": value}
     else:
         raise HTTPException(status_code=400, detail=f"שדה לא קיים: {field}")

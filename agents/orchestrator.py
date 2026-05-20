@@ -37,6 +37,12 @@ def enrich_invoice_from_db(invoice: Invoice) -> None:
                 data.supplier.tax_id_type = match["tax_id_type"]
             if match.get("address"):
                 data.supplier.address = match["address"]
+            # חשבון הוצאות שנשמר לספק בעבר — אם השדה עוד ריק, נטען מהטבלה
+            if not data.expense_account:
+                saved = companies_db.get_supplier_expense_account(match["priority_code"])
+                if saved:
+                    data.expense_account = saved
+                    logger.info("חשבון הוצאות נטען מהיסטוריה: %s", saved)
 
     # העשרת לקוח
     if data.customer and data.customer.tax_id:
