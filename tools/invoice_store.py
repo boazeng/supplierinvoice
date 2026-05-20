@@ -85,6 +85,7 @@ class InvoiceStore:
                 invoice_number=extracted.get("invoice_number", ""),
                 invoice_date=extracted.get("invoice_date", ""),
                 allocation_number=extracted.get("allocation_number", ""),
+                expense_account=extracted.get("expense_account", ""),
                 supplier=supplier,
                 customer=customer,
                 lines=lines,

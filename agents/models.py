@@ -73,6 +73,7 @@ class InvoiceData:
     invoice_number: str = ""
     invoice_date: str = ""              # YYYY-MM-DD
     allocation_number: str = ""         # מספר הקצאה — אישור ניכוי מס במקור
+    expense_account: str = ""           # חשבון הוצאות בפריורטי (מספר חשבון GL — נקלט ידנית)
     supplier: SupplierInfo = field(default_factory=SupplierInfo)
     customer: CustomerInfo = field(default_factory=CustomerInfo)
     lines: list[InvoiceLine] = field(default_factory=list)
