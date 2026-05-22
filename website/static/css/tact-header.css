@@ -7,8 +7,10 @@
     z-index: 200;
     display: flex;
     align-items: center;
-    gap: 20px;
-    flex-wrap: wrap;
+    gap: 18px;
+    flex-wrap: nowrap;            /* תמיד שורה אחת */
+    overflow-x: auto;             /* גלילה אופקית אם צר מדי — במקום גלישה לשורה שנייה */
+    scrollbar-width: none;
     background: #FFFEFB;
     border-bottom: 1px solid #E7E2D6;
     box-shadow: 0 1px 8px rgba(28, 27, 25, 0.05);
@@ -16,6 +18,7 @@
     color: #2A2A28;
     font-family: 'Heebo', 'Assistant', 'Segoe UI', Tahoma, sans-serif;
 }
+.tact-bar::-webkit-scrollbar { display: none; }
 
 /* --- T·A·C·T logo (forced LTR so it reads correctly) --- */
 .tact-logo { display: inline-flex; }
