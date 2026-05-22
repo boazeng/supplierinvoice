@@ -516,9 +516,10 @@ async def approve_invoice(invoice_id: str, body: dict = {}):
     }
 
 
-# מעברי סטטוס ידניים — אישור קליטה מהמייל, ביטול, העברה להמתנה, החזרה לתהליך
+# מעברי סטטוס ידניים — אישור, החזרה לאישור, העברה להמתנה, ביטול
 _MANUAL_STATUS = {
-    "pending_extraction": InvoiceStatus.PENDING_EXTRACTION,  # אישור / החזרה לתהליך
+    "pending_approval": InvoiceStatus.PENDING_APPROVAL,      # החזרה לאישור (מהמתנה/בוטל)
+    "pending_extraction": InvoiceStatus.PENDING_EXTRACTION,  # אישור לפענוח
     "on_hold": InvoiceStatus.ON_HOLD,                        # העברה להמתנה
     "cancelled": InvoiceStatus.CANCELLED,                    # ביטול
 }
