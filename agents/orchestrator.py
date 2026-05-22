@@ -44,28 +44,39 @@ def enrich_invoice_from_db(invoice: Invoice) -> None:
                     data.expense_account = saved
                     logger.info("חשבון הוצאות נטען מהיסטוריה: %s", saved)
 
-    # העשרת לקוח
-    if data.customer and data.customer.tax_id:
-        match = companies_db.find_by_tax_id(data.customer.tax_id, "customer")
-        if not match:
-            match = companies_db.find_by_tax_id(data.customer.tax_id)
-        if match:
-            logger.info("לקוח נמצא ב-DB: %s (קוד %s)", match["name"], match["priority_code"])
-            data.customer.name = match["name"]
-            data.customer.priority_customer_code = match["priority_code"]
-            data.customer.priority_match_found = True
-            data.customer.tax_id = match["tax_id"] or data.customer.tax_id
-            if match.get("tax_id_type"):
-                data.customer.tax_id_type = match["tax_id_type"]
-            if match.get("address"):
-                data.customer.address = match["address"]
-            # חיפוש סניף — הלקוח הוא אחת מ"החברות שלנו" (תת-חברה).
-            # שם תת-החברה (COMPANIES) הוא המוסמך — גובר על שם ה-CUSTOMERS.
+    # העשרת לקוח — בחשבונית ספק הלקוח הוא תמיד אחת מ"החברות שלנו"
+    # (תת-חברה / COMPANIES). מאתרים אותו בטבלת branches לפי ח.פ, ובהיעדר
+    # התאמה — לפי שם. אם לא נמצא — ייתכן שזו אינה חשבונית ספק.
+    if data.customer:
+        branch = None
+        if data.customer.tax_id:
             branch = companies_db.find_branch_by_tax_id(data.customer.tax_id)
-            if branch:
-                data.customer.branch = branch["branch_code"]
-                data.customer.name = branch["name"]
-                logger.info("סניף נמצא: %s (%s)", branch["branch_code"], branch["name"])
+        if not branch and data.customer.name:
+            name_matches = companies_db.find_branch_by_name(data.customer.name)
+            if len(name_matches) == 1:
+                branch = name_matches[0]
+        if branch:
+            data.customer.branch = branch["branch_code"]
+            data.customer.name = branch["name"]
+            data.customer.priority_match_found = True
+            if branch.get("tax_id"):
+                data.customer.tax_id = branch["tax_id"]
+            if branch.get("address"):
+                data.customer.address = branch["address"]
+            # קוד הלקוח ב-CUSTOMERS — לצורך קליטה בפריורטי, אם קיים
+            cust = companies_db.find_by_tax_id(branch["tax_id"], "customer") \
+                if branch.get("tax_id") else None
+            if cust:
+                data.customer.priority_customer_code = cust["priority_code"]
+            logger.info("לקוח זוהה כתת-חברה: %s (סניף %s)",
+                        branch["name"], branch["branch_code"])
+        else:
+            data.customer.priority_match_found = False
+            warn = "הלקוח אינו אחת מהחברות שלנו — ייתכן שזו אינה חשבונית ספק"
+            if warn not in data.extraction_warnings:
+                data.extraction_warnings.append(warn)
+            logger.warning("הלקוח לא זוהה כתת-חברה — ח.פ=%s שם=%s",
+                           data.customer.tax_id, data.customer.name)
 
 
 class Orchestrator:
