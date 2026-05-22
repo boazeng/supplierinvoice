@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ספרי הנהלת חשבונות</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/css/tact-header.css?v=1">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
         /* TACT brand palette */
@@ -21,7 +22,7 @@
                  justify-content:space-between; flex-wrap:wrap; gap:10px; }
         header h1 { font-size: 1.15rem; margin: 0; }
         header .right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-        a, .link { color:#fff; text-decoration:none; font-size:0.85rem; }
+        a { color:inherit; text-decoration:none; }
         .main { max-width: 1000px; margin: 0 auto; padding: 20px; }
         .card { background:var(--card); border-radius:var(--radius); padding:18px;
                 box-shadow:0 2px 12px rgba(0,0,0,.06); margin-bottom:16px; }
@@ -68,13 +69,27 @@
     </style>
 </head>
 <body>
-<header>
-    <h1>📒 ספרי הנהלת חשבונות</h1>
-    <div class="right">
-        <span id="current-user" style="font-size:0.8rem;opacity:.9"></span>
-        <a href="/">← חשבוניות ספק</a>
-        <a href="/logout">התנתק</a>
-    </div>
+<header class="tact-bar">
+    <span class="tact-logo">
+        <span class="tact-logo-row">
+            <span class="tact-logo-mark">
+                <span class="tact-logo-seg"><span class="tact-logo-letter">T</span><span class="tact-logo-dot"></span></span>
+                <span class="tact-logo-seg"><span class="tact-logo-letter">A</span><span class="tact-logo-dot"></span></span>
+                <span class="tact-logo-seg"><span class="tact-logo-letter">C</span><span class="tact-logo-dot"></span></span>
+                <span class="tact-logo-seg"><span class="tact-logo-letter">T</span></span>
+            </span>
+            <span class="tact-logo-word">accounting</span>
+        </span>
+    </span>
+    <nav class="tact-nav">
+        <a href="/">חשבוניות ספק</a>
+        <a href="/ledger" class="active">ספרי הנהלת חשבונות</a>
+        <a id="admin-link" href="/admin/users" style="display:none">ניהול משתמשים</a>
+    </nav>
+    <span class="tact-account">
+        <span id="current-user" class="tact-chip"></span>
+        <a href="/logout" class="tact-logout">התנתק</a>
+    </span>
 </header>
 
 <div class="main">
@@ -172,6 +187,7 @@
 </div></dialog>
 
 <div id="toast"></div>
+<script src="/static/js/tact-header.js"></script>
 <script src="/static/js/ledger.js"></script>
 </body>
 </html>

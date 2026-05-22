@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ניהול משתמשים</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/css/tact-header.css?v=1">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
         /* TACT brand palette */
@@ -12,8 +13,8 @@
                 --muted:#9B9486; --border:#E7E2D6; --danger:#D64A2E; --ok:#2F8F5B; }
         * { box-sizing: border-box; }
         body { font-family: Heebo, Arial, sans-serif; background: var(--bg);
-               color: var(--text); margin: 0; padding: 24px; }
-        .wrap { max-width: 900px; margin: 0 auto; }
+               color: var(--text); margin: 0; padding: 0; }
+        .wrap { max-width: 900px; margin: 0 auto; padding: 24px; }
         header { display: flex; justify-content: space-between; align-items: center;
                  margin-bottom: 20px; }
         h1 { font-size: 1.3rem; margin: 0; }
@@ -37,11 +38,29 @@
     </style>
 </head>
 <body>
+<header class="tact-bar">
+    <span class="tact-logo">
+        <span class="tact-logo-row">
+            <span class="tact-logo-mark">
+                <span class="tact-logo-seg"><span class="tact-logo-letter">T</span><span class="tact-logo-dot"></span></span>
+                <span class="tact-logo-seg"><span class="tact-logo-letter">A</span><span class="tact-logo-dot"></span></span>
+                <span class="tact-logo-seg"><span class="tact-logo-letter">C</span><span class="tact-logo-dot"></span></span>
+                <span class="tact-logo-seg"><span class="tact-logo-letter">T</span></span>
+            </span>
+            <span class="tact-logo-word">accounting</span>
+        </span>
+    </span>
+    <nav class="tact-nav">
+        <a href="/">חשבוניות ספק</a>
+        <a href="/ledger">ספרי הנהלת חשבונות</a>
+        <a id="admin-link" href="/admin/users" class="active">ניהול משתמשים</a>
+    </nav>
+    <span class="tact-account">
+        <span id="current-user" class="tact-chip"></span>
+        <a href="/logout" class="tact-logout">התנתק</a>
+    </span>
+</header>
 <div class="wrap">
-    <header>
-        <h1>👥 ניהול משתמשים</h1>
-        <a class="back" href="/">← חזרה למערכת</a>
-    </header>
 
     <div id="msg" class="msg"></div>
 
@@ -149,5 +168,6 @@ async function addUser() {
 
 load();
 </script>
+<script src="/static/js/tact-header.js"></script>
 </body>
 </html>

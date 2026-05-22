@@ -7,23 +7,31 @@
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
     <link rel="stylesheet" href="/static/css/main.css?v=tact1">
+    <link rel="stylesheet" href="/static/css/tact-header.css?v=1">
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header-content">
-            <h1>קליטת חשבוניות ספק</h1>
-            <div class="header-actions">
-                <button id="btn-sync" class="btn btn-secondary" onclick="app.syncPriority()">
-                    סנכרון Priority
-                </button>
-                <span id="sync-status" class="sync-badge">לא סונכרן</span>
-                <a href="/ledger" class="btn btn-secondary">📒 ספרי הנהלת חשבונות</a>
-                <span id="current-user" style="font-size:0.8rem;color:var(--text-secondary);margin-inline:8px"></span>
-                <a id="admin-link" href="/admin/users" class="btn btn-secondary" style="display:none">ניהול משתמשים</a>
-                <a href="/logout" class="btn btn-secondary">התנתק</a>
-            </div>
-        </div>
+    <!-- TACT header — page tabs -->
+    <header class="tact-bar">
+        <span class="tact-logo">
+            <span class="tact-logo-row">
+                <span class="tact-logo-mark">
+                    <span class="tact-logo-seg"><span class="tact-logo-letter">T</span><span class="tact-logo-dot"></span></span>
+                    <span class="tact-logo-seg"><span class="tact-logo-letter">A</span><span class="tact-logo-dot"></span></span>
+                    <span class="tact-logo-seg"><span class="tact-logo-letter">C</span><span class="tact-logo-dot"></span></span>
+                    <span class="tact-logo-seg"><span class="tact-logo-letter">T</span></span>
+                </span>
+                <span class="tact-logo-word">accounting</span>
+            </span>
+        </span>
+        <nav class="tact-nav">
+            <a href="/" class="active">חשבוניות ספק</a>
+            <a href="/ledger">ספרי הנהלת חשבונות</a>
+            <a id="admin-link" href="/admin/users" style="display:none">ניהול משתמשים</a>
+        </nav>
+        <span class="tact-account">
+            <span id="current-user" class="tact-chip"></span>
+            <a href="/logout" class="tact-logout">התנתק</a>
+        </span>
     </header>
 
     <main class="main-container">
@@ -41,6 +49,10 @@
                     <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif" hidden>
                 </label>
                 <span class="drop-zone-hint">PDF, PNG, JPG, TIFF</span>
+            </div>
+            <div class="sync-controls" style="display:flex;gap:10px;align-items:center;margin-top:8px">
+                <button id="btn-sync" class="btn btn-secondary btn-sm" onclick="app.syncPriority()">סנכרון Priority</button>
+                <span id="sync-status" class="sync-badge">לא סונכרן</span>
             </div>
         </section>
 
@@ -167,15 +179,6 @@
     <div id="toast-container" class="toast-container"></div>
 
     <script src="/static/js/app.js"></script>
-    <script>
-        // הצגת המשתמש המחובר + קישור ניהול ל-admin
-        fetch('/auth/me').then(r => r.json()).then(u => {
-            if (u && u.email) {
-                // הצגת הכינוי אם הוגדר, אחרת המייל
-                document.getElementById('current-user').textContent = '👤 ' + (u.name || u.email);
-                if (u.role === 'admin') document.getElementById('admin-link').style.display = '';
-            }
-        }).catch(() => {});
-    </script>
+    <script src="/static/js/tact-header.js"></script>
 </body>
 </html>

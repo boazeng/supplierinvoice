@@ -1,0 +1,107 @@
+/* TACT brand header — sticky light bar, floating-pill page tabs, T·A·C·T logo.
+   Brand chrome — hardcoded TACT values (steel #1F3A5F, rust #D64A2E, warm cream). */
+
+.tact-bar {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: #FFFEFB;
+    border-bottom: 1px solid #E7E2D6;
+    box-shadow: 0 1px 8px rgba(28, 27, 25, 0.05);
+    padding: 10px 24px;
+    color: #2A2A28;
+    font-family: 'Heebo', 'Assistant', 'Segoe UI', Tahoma, sans-serif;
+}
+
+/* --- T·A·C·T logo (forced LTR so it reads correctly) --- */
+.tact-logo { display: inline-flex; }
+.tact-logo-row { display: inline-flex; align-items: baseline; gap: 10px; direction: ltr; }
+.tact-logo-mark { display: inline-flex; align-items: center; }
+.tact-logo-seg { display: inline-flex; align-items: center; }
+.tact-logo-letter {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: #2A2A28;
+}
+.tact-logo-dot {
+    width: 0.3rem;
+    height: 0.3rem;
+    border-radius: 50%;
+    background: #D64A2E;            /* rust — the signature accent */
+    margin: 0 0.26rem;
+    align-self: center;
+}
+.tact-logo-word {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #706A60;
+}
+
+/* --- floating-pill page tabs --- */
+.tact-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #FFFEFB;
+    border: 1px solid #E7E2D6;
+    border-radius: 999px;
+    padding: 5px;
+    box-shadow: 0 6px 18px rgba(31, 58, 95, 0.08);
+}
+.tact-nav a {
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #706A60;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background .18s ease, color .18s ease, transform .18s ease;
+}
+.tact-nav a:not(.active):hover {
+    background: rgba(31, 58, 95, 0.12);
+    color: #1F3A5F;
+    font-weight: 600;
+    transform: translateY(-1px);
+}
+.tact-nav a.active {
+    background: #1F3A5F;            /* steel — active tab filled */
+    color: #F4F1EA;
+    font-weight: 600;
+}
+
+/* --- account chip — pushed to the far (left, in RTL) end --- */
+.tact-account {
+    margin-inline-start: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.tact-chip {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #2A2A28;
+    background: #F1EFE8;
+    border: 1px solid #E7E2D6;
+    border-radius: 999px;
+    padding: 5px 14px;
+}
+.tact-chip:empty { display: none; }
+.tact-logout {
+    font-size: 0.8rem;
+    color: #706A60;
+    text-decoration: none;
+    padding: 6px 13px;
+    border-radius: 999px;
+    border: 1px solid #E7E2D6;
+    transition: background .15s ease, color .15s ease;
+}
+.tact-logout:hover { background: #F1EFE8; color: #D64A2E; }
