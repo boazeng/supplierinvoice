@@ -352,6 +352,62 @@ const app = {
         this.currentInvoice = null;
     },
 
+    // תצוגה מקדימה של תנועת היומן שתיווצר בקליטה לפריורטי
+    toggleTransactionPreview() {
+        const box = document.getElementById('transaction-preview');
+        if (box.style.display === 'block') { box.style.display = 'none'; return; }
+
+        const d = this.currentInvoice && this.currentInvoice.extracted_data;
+        if (!d) { this.showToast('אין נתונים מחולצים', 'error'); return; }
+
+        const branch = ((d.customer && d.customer.branch) || '').trim();
+        const sfx = branch ? '-' + branch : '';
+        const subtotal = parseFloat(d.subtotal) || 0;
+        const vat = parseFloat(d.vat_amount) || 0;
+        const total = parseFloat(d.total_amount) || 0;
+        const expenseAcc = (d.expense_account || '').trim();
+        const supplierAcc = ((d.supplier && d.supplier.priority_supplier_code) || '').trim();
+
+        const money = n => n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const acc = base => base ? base + sfx : '— חסר —';
+
+        // פיצול: חובה לחשבון הוצאות (לפני מע"מ) + חובה למע"מ תשומות, זכות לספק (כולל מע"מ)
+        const rows = [];
+        rows.push({ acc: acc(expenseAcc), desc: 'חשבון הוצאות', debit: subtotal, credit: 0 });
+        if (vat > 0) rows.push({ acc: acc('205-2'), desc: 'מע"מ תשומות', debit: vat, credit: 0 });
+        rows.push({ acc: acc(supplierAcc), desc: (d.supplier && d.supplier.name) || 'ספק', debit: 0, credit: total });
+
+        let warn = '';
+        if (!branch) warn = '⚠ לא זוהה סניף ללקוח — קודי החשבון חסרים את סיומת הסניף.';
+        else if (!expenseAcc) warn = '⚠ לא הוזן חשבון הוצאות.';
+        else if (!supplierAcc) warn = '⚠ הספק לא זוהה בפריורטי.';
+
+        const dr = rows.reduce((s, r) => s + r.debit, 0);
+        const cr = rows.reduce((s, r) => s + r.credit, 0);
+        const balanced = Math.abs(dr - cr) < 0.01;
+
+        box.innerHTML = `
+            <h4 style="margin:0 0 6px;color:var(--accent)">תנועת יומן — תצוגה מקדימה</h4>
+            <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px">
+                סוג תנועה: חשבונית ספק · סניף: ${branch || '—'}</div>
+            ${warn ? `<div style="color:var(--danger);font-size:0.82rem;margin-bottom:8px">${warn}</div>` : ''}
+            <table class="invoice-table" style="width:100%">
+                <thead><tr><th>חשבון</th><th>תיאור</th><th>חובה</th><th>זכות</th></tr></thead>
+                <tbody>
+                    ${rows.map(r => `<tr>
+                        <td>${r.acc}</td><td>${r.desc}</td>
+                        <td>${r.debit ? '₪' + money(r.debit) : ''}</td>
+                        <td>${r.credit ? '₪' + money(r.credit) : ''}</td></tr>`).join('')}
+                    <tr style="font-weight:700;border-top:2px solid var(--border)">
+                        <td colspan="2">סה"כ</td>
+                        <td>₪${money(dr)}</td><td>₪${money(cr)}</td></tr>
+                </tbody>
+            </table>
+            <div style="font-size:0.8rem;margin-top:6px;color:${balanced ? 'var(--success)' : 'var(--danger)'}">
+                ${balanced ? '✓ התנועה מאוזנת' : '⚠ התנועה אינה מאוזנת — בדוק את הסכומים'}</div>`;
+        box.style.display = 'block';
+    },
+
     toggleFullscreen(forceOn = null) {
         const modal = document.getElementById('modal-content');
         const icon = document.getElementById('expand-icon');
