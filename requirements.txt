@@ -5,3 +5,8 @@ anthropic==0.43.0
 python-dotenv==1.0.1
 python-multipart==0.0.20
 watchdog==6.0.0
+itsdangerous==2.2.0
+
+# shared-auth — חבילת אימות משותפת. מותקנת בנפרד:
+#   pip install -e ../shared-auth   (פיתוח)
+# בשרת היא מותקנת מתיקיית /home/ec2-user/shared-auth

@@ -9,9 +9,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+
+from shared_auth import install_auth, require_role
 
 from agents.models import Invoice, InvoiceSource, InvoiceStatus
 from agents.orchestrator import Orchestrator
@@ -19,7 +21,7 @@ from priority.priority_client import PriorityClient
 from priority.invoice_submitter import submit_approved_invoice
 from priority.sync_agent import sync_from_priority, get_sync_status
 from tools.invoice_store import InvoiceStore
-from config.settings import INVOICES_DIR
+from config.settings import INVOICES_DIR, BASE_DIR
 from database import db as companies_db
 from database.sync import sync_all as sync_companies_from_priority
 
@@ -31,6 +33,18 @@ app = FastAPI(title="SupplierInvoice", version="1.0.0")
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# --- אימות והרשאות (shared-auth) ---
+auth = install_auth(
+    app,
+    db_path=BASE_DIR / "database" / "auth.db",
+    redirect_uri="https://bookkeeping.newavera.co.il/auth/callback",
+    initial_users=[
+        {"email": "boazen@gmail.com", "role": "admin"},
+        {"email": "boen01@gmail.com", "role": "admin"},
+    ],
+    public_prefixes=("/api/health",),
+)
 
 # --- Shared state (initialized in main.py) ---
 store: Optional[InvoiceStore] = None
@@ -59,6 +73,13 @@ async def serve_spa():
 async def favicon():
     """סמל הלשונית — חשבונית (SVG)."""
     return FileResponse(STATIC_DIR / "favicon.svg", media_type="image/svg+xml")
+
+
+@app.get("/admin/users", response_class=HTMLResponse, include_in_schema=False,
+         dependencies=[Depends(require_role("admin"))])
+async def admin_users_page():
+    """מסך ניהול משתמשים — admin בלבד."""
+    return HTMLResponse((TEMPLATES_DIR / "admin_users.html").read_text(encoding="utf-8"))
 
 
 @app.get("/api/health")
@@ -419,7 +440,8 @@ async def update_invoice_field(invoice_id: str, body: dict = {}):
         raise HTTPException(status_code=400, detail=f"שדה לא קיים: {field}")
 
 
-@app.post("/api/invoices/{invoice_id}/approve")
+@app.post("/api/invoices/{invoice_id}/approve",
+          dependencies=[Depends(require_role("approver"))])
 async def approve_invoice(invoice_id: str, body: dict = {}):
     """אישור קליטה בפריורטי."""
     invoice = store.get(invoice_id)
@@ -443,7 +465,8 @@ async def approve_invoice(invoice_id: str, body: dict = {}):
     }
 
 
-@app.post("/api/invoices/{invoice_id}/reject")
+@app.post("/api/invoices/{invoice_id}/reject",
+          dependencies=[Depends(require_role("approver"))])
 async def reject_invoice(invoice_id: str, body: dict = {}):
     """דחיית חשבונית."""
     invoice = store.get(invoice_id)
@@ -460,7 +483,8 @@ async def reject_invoice(invoice_id: str, body: dict = {}):
     return {"id": invoice.id, "status": "rejected", "message": "החשבונית נדחתה"}
 
 
-@app.delete("/api/invoices/{invoice_id}")
+@app.delete("/api/invoices/{invoice_id}",
+            dependencies=[Depends(require_role("approver"))])
 async def delete_invoice(invoice_id: str):
     """מחיקת חשבונית כולל הקובץ."""
     invoice = store.get(invoice_id)

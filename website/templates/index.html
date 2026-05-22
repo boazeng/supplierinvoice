@@ -18,6 +18,9 @@
                     סנכרון Priority
                 </button>
                 <span id="sync-status" class="sync-badge">לא סונכרן</span>
+                <span id="current-user" style="font-size:0.8rem;color:var(--text-secondary);margin-inline:8px"></span>
+                <a id="admin-link" href="/admin/users" class="btn btn-secondary" style="display:none">ניהול משתמשים</a>
+                <a href="/logout" class="btn btn-secondary">התנתק</a>
             </div>
         </div>
     </header>
@@ -163,5 +166,14 @@
     <div id="toast-container" class="toast-container"></div>
 
     <script src="/static/js/app.js"></script>
+    <script>
+        // הצגת המשתמש המחובר + קישור ניהול ל-admin
+        fetch('/auth/me').then(r => r.json()).then(u => {
+            if (u && u.email) {
+                document.getElementById('current-user').textContent = '👤 ' + u.email;
+                if (u.role === 'admin') document.getElementById('admin-link').style.display = '';
+            }
+        }).catch(() => {});
+    </script>
 </body>
 </html>
