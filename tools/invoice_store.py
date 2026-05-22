@@ -51,12 +51,17 @@ class InvoiceStore:
         return self._dict_to_invoice(raw)
 
     def get_all(self, status: Optional[str] = None) -> list[Invoice]:
-        """מחזיר את כל החשבוניות, עם אפשרות סינון לפי סטטוס."""
+        """מחזיר את כל החשבוניות, עם אפשרות סינון לפי סטטוס.
+
+        הסינון נעשה על הסטטוס לאחר מיגרציה (_dict_to_invoice) ולא על
+        הערך הגולמי — כדי שחשבוניות ישנות (שטרם נשמרו מחדש) יסוננו נכון.
+        """
         invoices = []
         for raw in self._store.values():
-            if status and raw.get("status") != status:
+            invoice = self._dict_to_invoice(raw)
+            if status and invoice.status.value != status:
                 continue
-            invoices.append(self._dict_to_invoice(raw))
+            invoices.append(invoice)
         # מיון לפי תאריך יצירה (חדשות קודם)
         invoices.sort(key=lambda x: x.created_at, reverse=True)
         return invoices
