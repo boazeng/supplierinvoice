@@ -59,10 +59,12 @@ def enrich_invoice_from_db(invoice: Invoice) -> None:
                 data.customer.tax_id_type = match["tax_id_type"]
             if match.get("address"):
                 data.customer.address = match["address"]
-            # חיפוש סניף
+            # חיפוש סניף — הלקוח הוא אחת מ"החברות שלנו" (תת-חברה).
+            # שם תת-החברה (COMPANIES) הוא המוסמך — גובר על שם ה-CUSTOMERS.
             branch = companies_db.find_branch_by_tax_id(data.customer.tax_id)
             if branch:
                 data.customer.branch = branch["branch_code"]
+                data.customer.name = branch["name"]
                 logger.info("סניף נמצא: %s (%s)", branch["branch_code"], branch["name"])
 
 
