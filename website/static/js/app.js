@@ -143,6 +143,10 @@ const app = {
             const invoice = await res.json();
             this.currentInvoice = invoice;
 
+            // איפוס פאנל "פרטי התנועה" — שלא יישאר תוכן מהחשבונית הקודמת
+            const txBox = document.getElementById('transaction-preview');
+            if (txBox) { txBox.innerHTML = ''; txBox.style.display = 'none'; }
+
             const modal = document.getElementById('invoice-modal');
             modal.style.display = 'flex';
             this.toggleFullscreen(true);
