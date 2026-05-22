@@ -20,6 +20,14 @@
 }
 .tact-bar::-webkit-scrollbar { display: none; }
 
+/* פריטי הכותרת לא מתכווצים, והטקסט בתוכם לא נשבר לשתי שורות
+   (אם צר מדי — הבר גולל אופקית, ראה overflow-x למעלה) */
+.tact-bar > *,
+.tact-account > * { flex-shrink: 0; }
+.tact-chip,
+.tact-logout,
+.tact-bar button { white-space: nowrap; }
+
 /* --- T·A·C·T logo (forced LTR so it reads correctly) --- */
 .tact-logo { display: inline-flex; }
 .tact-logo-row { display: inline-flex; align-items: baseline; gap: 10px; direction: ltr; }
