@@ -323,13 +323,12 @@ body {
     font-weight: 500;
 }
 
-.status-pending    { background: #9B948620; color: #706A60; }
+.status-pending_approval   { background: #B07D2B1f; color: #8A5F1E; }
 .status-pending_extraction { background: #B07D2B1f; color: #8A5F1E; }
-.status-processing { background: #1F3A5F18; color: #1F3A5F; }
-.status-review     { background: #B07D2B1f; color: #8A5F1E; }
-.status-submitted  { background: #2F8F5B1f; color: #2F8F5B; }
-.status-rejected   { background: #D64A2E18; color: #D64A2E; }
-.status-error      { background: #D64A2E18; color: #D64A2E; }
+.status-pending_submission { background: #1F3A5F18; color: #1F3A5F; }
+.status-pending_filing     { background: #2F8F5B1f; color: #2F8F5B; }
+.status-on_hold            { background: #9B948624; color: #706A60; }
+.status-cancelled          { background: #D64A2E18; color: #D64A2E; }
 
 /* === Modal === */
 .modal {

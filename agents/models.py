@@ -11,13 +11,13 @@ from typing import Optional
 
 
 class InvoiceStatus(str, Enum):
-    PENDING = "pending"
-    PENDING_EXTRACTION = "pending_extraction"   # נקלט ממייל — ממתין לאישור לפענוח
-    PROCESSING = "processing"
-    REVIEW = "review"
-    SUBMITTED = "submitted"
-    REJECTED = "rejected"
-    ERROR = "error"
+    """מצבי "המתנה" — כל סטטוס מתאר את הפעולה הבאה שממתינה."""
+    PENDING_APPROVAL = "pending_approval"        # ממתין לאישור — הובא מהמייל
+    PENDING_EXTRACTION = "pending_extraction"    # ממתין לפענוח — ברשימה, טרם פוענח
+    PENDING_SUBMISSION = "pending_submission"    # ממתין לקליטה — פוענח, טרם נקלט בפריורטי
+    PENDING_FILING = "pending_filing"            # ממתין לתיוק — נקלט בפריורטי, טרם תויק
+    ON_HOLD = "on_hold"                          # בהמתנה — הועבר להמשך טיפול
+    CANCELLED = "cancelled"                      # בוטל
 
 
 class InvoiceSource(str, Enum):
@@ -90,10 +90,11 @@ class InvoiceData:
 class Invoice:
     """הישות הראשית — חשבונית ספק."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    status: InvoiceStatus = InvoiceStatus.PENDING
+    status: InvoiceStatus = InvoiceStatus.PENDING_EXTRACTION
     source: InvoiceSource = InvoiceSource.UPLOAD
     file_path: str = ""
     file_type: str = ""                 # pdf / image
+    extraction_ok: Optional[bool] = None  # None=טרם פוענח · True=פוענח בהצלחה · False=נכשל
     extracted_data: Optional[InvoiceData] = None
     priority_validation: dict = field(default_factory=dict)
     priority_invoice_id: str = ""       # IVNUM שהתקבל מ-Priority לאחר קליטה

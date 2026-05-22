@@ -180,13 +180,11 @@ async def upload_invoice(file: UploadFile = File(...)):
     )
     store.save(invoice)
 
-    # הפעלת עיבוד ברקע
-    orchestrator.start_background_processing(invoice.id)
-
+    # העלאה ידנית נכנסת ל"ממתין לפענוח" — המשתמש לוחץ "פענח" כשמוכן
     return {
         "id": invoice.id,
         "status": invoice.status.value,
-        "message": "החשבונית הועלתה ונכנסה לעיבוד",
+        "message": "החשבונית הועלתה — ממתינה לפענוח",
     }
 
 
@@ -220,7 +218,7 @@ async def fetch_email_invoices():
             source=InvoiceSource.EMAIL,
             file_path=str(save_path),
             file_type="pdf" if ext == ".pdf" else "image",
-            status=InvoiceStatus.PENDING_EXTRACTION,
+            status=InvoiceStatus.PENDING_APPROVAL,
         )
         store.save(invoice)
         created += 1
@@ -408,10 +406,6 @@ async def reextract_invoice_api(invoice_id: str, body: dict = {}):
     crop_coords = body.get("crop_coords", {})
     logger.info("פענוח חוזר לחשבונית %s עם coords: %s", invoice_id, crop_coords)
 
-    invoice.status = InvoiceStatus.PROCESSING
-    invoice.updated_at = datetime.now().isoformat()
-    store.save(invoice)
-
     try:
         invoice.extracted_data = await reextract_invoice(invoice.file_path, crop_coords)
         # העשרת ספק/לקוח מ-DB → ממלא priority_supplier_code / priority_customer_code
@@ -419,10 +413,12 @@ async def reextract_invoice_api(invoice_id: str, body: dict = {}):
         invoice.priority_validation = await validate_invoice_data(
             invoice.extracted_data, priority_client
         )
-        invoice.status = InvoiceStatus.REVIEW
+        invoice.extraction_ok = True
+        invoice.status = InvoiceStatus.PENDING_SUBMISSION
         invoice.error_message = ""
     except Exception as e:
-        invoice.status = InvoiceStatus.ERROR
+        invoice.extraction_ok = False
+        invoice.status = InvoiceStatus.PENDING_EXTRACTION
         invoice.error_message = str(e)
         logger.error("שגיאה בפענוח חוזר %s: %s", invoice_id, e)
 
@@ -433,7 +429,7 @@ async def reextract_invoice_api(invoice_id: str, body: dict = {}):
         "id": invoice.id,
         "status": invoice.status.value,
         "extracted_data": asdict(invoice.extracted_data) if invoice.extracted_data else None,
-        "message": "פענוח חוזר הושלם" if invoice.status == InvoiceStatus.REVIEW else invoice.error_message,
+        "message": "פענוח חוזר הושלם" if invoice.status == InvoiceStatus.PENDING_SUBMISSION else invoice.error_message,
     }
 
 
@@ -503,8 +499,8 @@ async def approve_invoice(invoice_id: str, body: dict = {}):
     if not invoice:
         raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
 
-    if invoice.status != InvoiceStatus.REVIEW:
-        raise HTTPException(status_code=400, detail=f"לא ניתן לאשר חשבונית בסטטוס {invoice.status.value}")
+    if invoice.status != InvoiceStatus.PENDING_SUBMISSION:
+        raise HTTPException(status_code=400, detail=f"לא ניתן לקלוט חשבונית בסטטוס {invoice.status.value}")
 
     # עדכון הערות משתמש
     invoice.user_notes = body.get("notes", "")
@@ -516,26 +512,34 @@ async def approve_invoice(invoice_id: str, body: dict = {}):
         "id": invoice.id,
         "status": invoice.status.value,
         "priority_invoice_id": invoice.priority_invoice_id,
-        "message": "החשבונית נקלטה בפריורטי" if invoice.status == InvoiceStatus.SUBMITTED else invoice.error_message,
+        "message": "החשבונית נקלטה בפריורטי" if invoice.status == InvoiceStatus.PENDING_FILING else invoice.error_message,
     }
 
 
-@app.post("/api/invoices/{invoice_id}/reject",
-          dependencies=[Depends(require_role("approver"))])
-async def reject_invoice(invoice_id: str, body: dict = {}):
-    """דחיית חשבונית."""
+# מעברי סטטוס ידניים — אישור קליטה מהמייל, ביטול, העברה להמתנה, החזרה לתהליך
+_MANUAL_STATUS = {
+    "pending_extraction": InvoiceStatus.PENDING_EXTRACTION,  # אישור / החזרה לתהליך
+    "on_hold": InvoiceStatus.ON_HOLD,                        # העברה להמתנה
+    "cancelled": InvoiceStatus.CANCELLED,                    # ביטול
+}
+
+
+@app.post("/api/invoices/{invoice_id}/status")
+async def set_invoice_status(invoice_id: str, body: dict = {}):
+    """שינוי סטטוס ידני: אישור לפענוח / העברה להמתנה / ביטול / החזרה לתהליך."""
     invoice = store.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
-
-    invoice.status = InvoiceStatus.REJECTED
-    invoice.user_notes = body.get("reason", "")
+    target = body.get("status", "")
+    if target not in _MANUAL_STATUS:
+        raise HTTPException(status_code=400, detail=f"סטטוס לא חוקי: {target}")
+    invoice.status = _MANUAL_STATUS[target]
+    if body.get("notes"):
+        invoice.user_notes = body["notes"]
     invoice.updated_at = datetime.now().isoformat()
     store.save(invoice)
-
-    logger.info("חשבונית %s נדחתה — סיבה: %s", invoice_id, invoice.user_notes)
-
-    return {"id": invoice.id, "status": "rejected", "message": "החשבונית נדחתה"}
+    logger.info("סטטוס חשבונית %s שונה ידנית ל-%s", invoice_id, target)
+    return {"id": invoice.id, "status": invoice.status.value}
 
 
 @app.delete("/api/invoices/{invoice_id}",

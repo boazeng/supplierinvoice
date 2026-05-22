@@ -97,11 +97,6 @@ class Orchestrator:
 
         logger.info("מתחיל עיבוד חשבונית: %s", invoice_id)
 
-        # --- PROCESSING ---
-        invoice.status = InvoiceStatus.PROCESSING
-        invoice.updated_at = datetime.now().isoformat()
-        self.store.save(invoice)
-
         try:
             # שלב 1: חילוץ נתונים מהקובץ
             logger.info("שלב 1 — חילוץ נתונים מהקובץ")
@@ -117,12 +112,16 @@ class Orchestrator:
                 self.priority_client,
             )
 
-            # --- REVIEW ---
-            invoice.status = InvoiceStatus.REVIEW
-            logger.info("חשבונית %s מוכנה לבקרה", invoice_id)
+            # פוענח בהצלחה → ממתין לקליטה
+            invoice.extraction_ok = True
+            invoice.error_message = ""
+            invoice.status = InvoiceStatus.PENDING_SUBMISSION
+            logger.info("חשבונית %s פוענחה — ממתינה לקליטה", invoice_id)
 
         except Exception as e:
-            invoice.status = InvoiceStatus.ERROR
+            # פענוח נכשל → נשאר "ממתין לפענוח", סימון כשל (X)
+            invoice.extraction_ok = False
+            invoice.status = InvoiceStatus.PENDING_EXTRACTION
             invoice.error_message = str(e)
             logger.error("שגיאה בעיבוד חשבונית %s: %s", invoice_id, e)
 

@@ -64,13 +64,16 @@ async def submit_approved_invoice(
     try:
         result = await priority_client.submit_invoice(payload)
         invoice.priority_invoice_id = result.get("IVNUM", "")
-        invoice.status = InvoiceStatus.SUBMITTED
+        # נקלט בפריורטי → ממתין לתיוק בספרי הנהלת חשבונות
+        invoice.status = InvoiceStatus.PENDING_FILING
+        invoice.error_message = ""
         logger.info(
             "חשבונית נקלטה בפריורטי בהצלחה — IVNUM: %s",
             invoice.priority_invoice_id,
         )
     except Exception as e:
-        invoice.status = InvoiceStatus.ERROR
+        # קליטה נכשלה → נשאר "ממתין לקליטה" לניסיון חוזר
+        invoice.status = InvoiceStatus.PENDING_SUBMISSION
         invoice.error_message = f"שגיאה בקליטה בפריורטי: {e}"
         logger.error("שגיאה בקליטה: %s", e)
 

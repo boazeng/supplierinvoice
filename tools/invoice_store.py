@@ -97,12 +97,32 @@ class InvoiceStore:
                 extraction_warnings=extracted.get("extraction_warnings", []),
             )
 
+        # מיגרציה — מיפוי סטטוסים ישנים למודל הסטטוסים החדש
+        _STATUS_MIGRATION = {
+            "pending": "pending_extraction",
+            "processing": "pending_extraction",
+            "review": "pending_submission",
+            "submitted": "pending_filing",
+            "rejected": "cancelled",
+            "error": "pending_extraction",
+        }
+        raw_status = raw.get("status", "pending_extraction")
+        status = InvoiceStatus(_STATUS_MIGRATION.get(raw_status, raw_status))
+
+        # extraction_ok — None טרם פוענח · True הצליח · False נכשל.
+        # לחשבוניות ישנות שכבר חולצו ואין להן ערך — נגזר True.
+        extraction_ok = raw.get("extraction_ok")
+        if extraction_ok is None and extracted_data is not None \
+                and (extracted_data.invoice_number or extracted_data.supplier.name):
+            extraction_ok = True
+
         return Invoice(
             id=raw["id"],
-            status=InvoiceStatus(raw.get("status", "pending")),
+            status=status,
             source=InvoiceSource(raw.get("source", "upload")),
             file_path=raw.get("file_path", ""),
             file_type=raw.get("file_type", ""),
+            extraction_ok=extraction_ok,
             extracted_data=extracted_data,
             priority_validation=raw.get("priority_validation", {}),
             priority_invoice_id=raw.get("priority_invoice_id", ""),

@@ -89,21 +89,28 @@ const app = {
         const container = document.getElementById('invoice-list');
 
         if (invoices.length === 0) {
-            container.innerHTML = '<tr><td colspan="7" class="empty-state">אין חשבוניות להצגה</td></tr>';
+            container.innerHTML = '<tr><td colspan="8" class="empty-state">אין חשבוניות להצגה</td></tr>';
             return;
         }
 
         const statusLabels = {
-            pending: 'ממתין',
+            pending_approval: 'ממתין לאישור',
             pending_extraction: 'ממתין לפענוח',
-            processing: 'בעיבוד',
-            review: 'לבקרה',
-            submitted: 'נקלט',
-            rejected: 'נדחה',
-            error: 'שגיאה',
+            pending_submission: 'ממתין לקליטה',
+            pending_filing: 'ממתין לתיוק',
+            on_hold: 'בהמתנה',
+            cancelled: 'בוטל',
         };
 
         const fmt = (n) => n != null && n !== 0 ? `₪${Number(n).toLocaleString('he-IL', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+
+        // ריבוע פענוח — ✓ הצליח · ✗ נכשל · ריק טרם בוצע
+        const extractBox = (ok) => {
+            const sym = ok === true ? '✓' : ok === false ? '✗' : '';
+            const col = ok === true ? 'var(--success)' : ok === false ? 'var(--danger)' : 'var(--border)';
+            return `<span style="display:inline-flex;width:20px;height:20px;border:1.5px solid ${col};`
+                + `border-radius:4px;align-items:center;justify-content:center;color:${col};font-weight:700">${sym}</span>`;
+        };
 
         container.innerHTML = invoices.map(inv => {
             const d = inv.extracted_data;
@@ -122,6 +129,7 @@ const app = {
                     <td class="col-amount">${fmt(beforeVat)}</td>
                     <td class="col-amount">${fmt(afterVat)}</td>
                     <td>${date}</td>
+                    <td style="text-align:center">${extractBox(inv.extraction_ok)}</td>
                     <td><span class="status-badge status-${inv.status}">${statusLabels[inv.status] || inv.status}</span></td>
                     <td><button class="btn-delete-row" title="מחק חשבונית" onclick="event.stopPropagation(); app.deleteInvoiceById('${inv.id}')">🗑</button></td>
                 </tr>
@@ -325,34 +333,35 @@ const app = {
         // Notes
         document.getElementById('user-notes').value = inv.user_notes || '';
 
-        // Action buttons / extract button / status display
+        // כפתורי פעולה לפי סטטוס + תווית הסטטוס
         const actionBtns = document.getElementById('action-buttons');
         const statusDisplay = document.getElementById('status-display');
-        const extractBtn = document.getElementById('btn-extract');
+        const s = inv.status;
+        const showBtn = (id, on) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = on ? '' : 'none';
+        };
 
-        if (inv.status === 'review') {
-            actionBtns.style.display = 'flex';
-            if (extractBtn) extractBtn.style.display = 'none';
-            statusDisplay.style.display = 'none';
-        } else if (inv.status === 'pending_extraction') {
-            actionBtns.style.display = 'none';
-            if (extractBtn) extractBtn.style.display = '';
-            statusDisplay.style.display = 'none';
-        } else {
-            actionBtns.style.display = 'none';
-            if (extractBtn) extractBtn.style.display = 'none';
-            const statusMessages = {
-                pending: 'ממתין לעיבוד',
-                pending_extraction: 'ממתין לאישור לפענוח',
-                processing: 'בעיבוד...',
-                submitted: `נקלט בפריורטי — ${inv.priority_invoice_id || ''}`,
-                rejected: `נדחה — ${inv.user_notes || ''}`,
-                error: `שגיאה: ${inv.error_message || ''}`,
-            };
-            statusDisplay.innerHTML = statusMessages[inv.status] || inv.status;
-            statusDisplay.className = `status-display status-badge status-${inv.status}`;
-            statusDisplay.style.display = 'block';
-        }
+        actionBtns.style.display = 'flex';
+        showBtn('btn-approve-intake', s === 'pending_approval');
+        showBtn('btn-extract', s === 'pending_extraction');
+        showBtn('btn-submit', s === 'pending_submission');
+        showBtn('btn-restore', s === 'on_hold' || s === 'cancelled');
+        showBtn('btn-hold', s !== 'on_hold' && s !== 'cancelled');
+        showBtn('btn-cancel', s !== 'cancelled');
+        // btn-delete-modal — תמיד גלוי
+
+        const statusLabels = {
+            pending_approval: 'ממתין לאישור',
+            pending_extraction: 'ממתין לפענוח',
+            pending_submission: 'ממתין לקליטה',
+            pending_filing: 'ממתין לתיוק',
+            on_hold: 'בהמתנה',
+            cancelled: 'בוטל',
+        };
+        statusDisplay.textContent = statusLabels[s] || s;
+        statusDisplay.className = `status-display status-badge status-${s}`;
+        statusDisplay.style.display = 'block';
     },
 
     closeModal() {
@@ -946,6 +955,28 @@ const app = {
         } finally {
             btn.disabled = false;
             btn.textContent = 'פענח';
+        }
+    },
+
+    // שינוי סטטוס ידני — אישור / ביטול / העברה להמתנה / החזרה לתהליך
+    async changeStatus(status, note) {
+        if (!this.currentInvoice) return;
+        try {
+            const res = await fetch(`/api/invoices/${this.currentInvoice.id}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status, notes: note || '' }),
+            });
+            if (res.ok) {
+                this.showToast(note || 'הסטטוס עודכן', 'success');
+                this.closeModal();
+                this.loadInvoices();
+            } else {
+                const d = await res.json().catch(() => ({}));
+                this.showToast(d.detail || 'שגיאה בעדכון סטטוס', 'error');
+            }
+        } catch (err) {
+            this.showToast('שגיאת תקשורת', 'error');
         }
     },
 

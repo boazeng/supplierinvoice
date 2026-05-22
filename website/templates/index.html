@@ -6,7 +6,7 @@
     <title>קליטת חשבוניות ספק</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/main.css?v=tact2">
+    <link rel="stylesheet" href="/static/css/main.css?v=tact3">
     <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
 </head>
 <body>
@@ -59,12 +59,12 @@
         <!-- Status Filter Tabs -->
         <section class="filter-tabs">
             <button class="tab active" data-status="" onclick="app.filterByStatus(this, '')">הכל</button>
-            <button class="tab" data-status="pending_extraction" onclick="app.filterByStatus(this, 'pending_extraction')">ממתין לפענוח</button>
-            <button class="tab" data-status="review" onclick="app.filterByStatus(this, 'review')">ממתינות לבקרה</button>
-            <button class="tab" data-status="processing" onclick="app.filterByStatus(this, 'processing')">בעיבוד</button>
-            <button class="tab" data-status="submitted" onclick="app.filterByStatus(this, 'submitted')">נקלטו</button>
-            <button class="tab" data-status="rejected" onclick="app.filterByStatus(this, 'rejected')">נדחו</button>
-            <button class="tab" data-status="error" onclick="app.filterByStatus(this, 'error')">שגיאות</button>
+            <button class="tab" data-status="pending_approval" onclick="app.filterByStatus(this, 'pending_approval')">אישור</button>
+            <button class="tab" data-status="pending_extraction" onclick="app.filterByStatus(this, 'pending_extraction')">פענוח</button>
+            <button class="tab" data-status="pending_submission" onclick="app.filterByStatus(this, 'pending_submission')">קליטה</button>
+            <button class="tab" data-status="pending_filing" onclick="app.filterByStatus(this, 'pending_filing')">תיוק</button>
+            <button class="tab" data-status="on_hold" onclick="app.filterByStatus(this, 'on_hold')">המתנה</button>
+            <button class="tab" data-status="cancelled" onclick="app.filterByStatus(this, 'cancelled')">בוטל</button>
         </section>
 
         <!-- Invoice Table -->
@@ -77,12 +77,13 @@
                         <th>סה"כ לפני מע"מ</th>
                         <th>סה"כ כולל מע"מ</th>
                         <th>תאריך העלאה</th>
-                        <th>סטטוס</th>
+                        <th>פענוח</th>
+                        <th>סטטוס המתנה</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody id="invoice-list">
-                    <tr><td colspan="7" class="empty-state">אין חשבוניות להצגה</td></tr>
+                    <tr><td colspan="8" class="empty-state">אין חשבוניות להצגה</td></tr>
                 </tbody>
             </table>
         </section>
@@ -94,20 +95,22 @@
                 <div class="modal-toolbar">
                     <h3 style="font-size:0.95rem;font-weight:600;margin:0">פרטי חשבונית</h3>
                     <div style="display:flex;align-items:center;gap:10px">
-                        <!-- Extract button (visible only when status=pending_extraction) -->
-                        <button id="btn-extract" class="btn btn-primary btn-sm" style="display:none"
-                                onclick="app.extractInvoice()">פענח</button>
-                        <!-- Action Buttons (visible only when status=review) -->
+                        <!-- כפתורי פעולה — נראות לפי סטטוס (app.renderModal) -->
                         <div id="action-buttons" class="action-buttons">
-                            <button class="btn btn-success btn-sm" onclick="app.approveInvoice()">
-                                אשר וקלוט בפריורטי
-                            </button>
-                            <button class="btn btn-danger btn-sm" onclick="app.rejectInvoice()">
-                                דחה
-                            </button>
-                            <button class="btn btn-sm" style="background:var(--text-muted);color:white" onclick="app.deleteInvoice()">
-                                🗑 מחק
-                            </button>
+                            <button id="btn-approve-intake" class="btn btn-success btn-sm" style="display:none"
+                                    onclick="app.changeStatus('pending_extraction','אושר לפענוח')">אשר</button>
+                            <button id="btn-extract" class="btn btn-primary btn-sm" style="display:none"
+                                    onclick="app.extractInvoice()">פענח</button>
+                            <button id="btn-submit" class="btn btn-success btn-sm" style="display:none"
+                                    onclick="app.approveInvoice()">אשר וקלוט בפריורטי</button>
+                            <button id="btn-restore" class="btn btn-primary btn-sm" style="display:none"
+                                    onclick="app.changeStatus('pending_extraction','הוחזר לתהליך')">החזר לתהליך</button>
+                            <button id="btn-hold" class="btn btn-sm" style="display:none;background:var(--text-muted);color:#fff"
+                                    onclick="app.changeStatus('on_hold','הועבר להמתנה')">העבר להמתנה</button>
+                            <button id="btn-cancel" class="btn btn-danger btn-sm" style="display:none"
+                                    onclick="app.changeStatus('cancelled','בוטל')">בטל</button>
+                            <button id="btn-delete-modal" class="btn btn-sm" style="background:var(--text-muted);color:#fff"
+                                    onclick="app.deleteInvoice()">🗑 מחק</button>
                         </div>
                         <button class="btn-expand" onclick="app.toggleFullscreen()" title="הגדל/הקטן מסך">
                             <span id="expand-icon">⛶</span>
@@ -186,7 +189,7 @@
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/js/app.js?v=tx4"></script>
+    <script src="/static/js/app.js?v=tx5"></script>
     <script src="/static/js/tact-header.js"></script>
 </body>
 </html>
