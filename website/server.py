@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from shared_auth import install_auth, require_role
+from website.ledger_routes import register_ledger_routes
 
 from agents.models import Invoice, InvoiceSource, InvoiceStatus
 from agents.orchestrator import Orchestrator
@@ -45,6 +46,9 @@ auth = install_auth(
     ],
     public_prefixes=("/api/health",),
 )
+
+# --- מערכת ספרי הנהלת חשבונות ---
+register_ledger_routes(app, TEMPLATES_DIR)
 
 # --- Shared state (initialized in main.py) ---
 store: Optional[InvoiceStore] = None

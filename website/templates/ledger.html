@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ספרי הנהלת חשבונות</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <style>
+        :root {
+            --accent:#2563eb; --accent-dark:#1e40af; --bg:#f0f4f8; --card:#fff;
+            --text:#1a2a3a; --text2:#4a5f78; --muted:#8899aa; --border:#d0dbe8;
+            --danger:#dc2626; --ok:#16a34a; --radius:10px;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: Heebo, Arial, sans-serif; background: var(--bg);
+               color: var(--text); margin: 0; }
+        header { background: linear-gradient(135deg,var(--accent-dark),var(--accent));
+                 color:#fff; padding: 12px 24px; display:flex; align-items:center;
+                 justify-content:space-between; flex-wrap:wrap; gap:10px; }
+        header h1 { font-size: 1.15rem; margin: 0; }
+        header .right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+        a, .link { color:#fff; text-decoration:none; font-size:0.85rem; }
+        .main { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .card { background:var(--card); border-radius:var(--radius); padding:18px;
+                box-shadow:0 2px 12px rgba(0,0,0,.06); margin-bottom:16px; }
+        select, input, button { font-family:inherit; font-size:0.9rem; }
+        select, input[type=text], input[type=date], input[type=number] {
+            padding:7px 10px; border:1px solid var(--border); border-radius:7px; }
+        button { padding:7px 16px; border:none; border-radius:7px; cursor:pointer; }
+        .btn-primary { background:var(--accent); color:#fff; }
+        .btn-ok { background:var(--ok); color:#fff; }
+        .btn-danger { background:var(--danger); color:#fff; }
+        .btn-light { background:var(--bg); color:var(--text2); border:1px solid var(--border); }
+        .btn-sm { padding:4px 10px; font-size:0.8rem; }
+        .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+        h2 { font-size:1rem; margin:0 0 12px; color:var(--accent-dark); }
+        .muted { color:var(--muted); font-size:0.85rem; }
+        .year-btn { padding:14px 22px; border:2px solid var(--border); background:#fff;
+                    border-radius:var(--radius); cursor:pointer; font-size:1rem;
+                    font-weight:600; color:var(--text); }
+        .year-btn:hover { border-color:var(--accent); }
+        .year-btn.active { border-color:var(--accent); background:#eff5ff; color:var(--accent-dark); }
+        .month-group { margin-bottom:18px; }
+        .month-head { font-weight:700; color:var(--accent-dark); padding:6px 0;
+                      border-bottom:2px solid var(--border); margin-bottom:6px; }
+        .doc { display:flex; align-items:center; gap:12px; padding:9px 8px;
+               border-bottom:1px solid var(--border); }
+        .doc:hover { background:#f7faff; }
+        .doc .date { font-weight:600; min-width:88px; font-variant-numeric:tabular-nums; }
+        .doc .title { flex:1; min-width:120px; }
+        .tag { background:#eef2f7; color:var(--text2); border-radius:12px;
+               padding:2px 9px; font-size:0.75rem; }
+        .tag.divider { background:#fef3c7; color:#92400e; }
+        .doc .actions { display:flex; gap:5px; }
+        .badge-scan { font-size:0.68rem; color:var(--danger); }
+        dialog { border:none; border-radius:var(--radius); padding:0; max-width:440px; width:92%; }
+        dialog::backdrop { background:rgba(0,0,0,.45); }
+        .dlg-body { padding:22px; }
+        .dlg-body h3 { margin:0 0 14px; }
+        .field { margin-bottom:12px; }
+        .field label { display:block; font-size:0.8rem; color:var(--text2); margin-bottom:4px; }
+        .field input, .field select { width:100%; }
+        .hidden { display:none !important; }
+        #toast { position:fixed; bottom:20px; left:20px; background:var(--text);
+                 color:#fff; padding:12px 20px; border-radius:8px; display:none; z-index:50; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>📒 ספרי הנהלת חשבונות</h1>
+    <div class="right">
+        <span id="current-user" style="font-size:0.8rem;opacity:.9"></span>
+        <a href="/">← חשבוניות ספק</a>
+        <a href="/logout">התנתק</a>
+    </div>
+</header>
+
+<div class="main">
+    <!-- בחירת חברה -->
+    <div class="card">
+        <h2>חברה</h2>
+        <div class="row">
+            <select id="company-select" style="min-width:260px">
+                <option value="">— בחר חברה —</option>
+            </select>
+            <button class="btn-ok" onclick="L.openNewCompany()">+ חברה חדשה</button>
+        </div>
+    </div>
+
+    <!-- בחירת ספר (שנה) -->
+    <div class="card hidden" id="books-card">
+        <h2>ספר / שנה</h2>
+        <div class="row" id="books-row"></div>
+    </div>
+
+    <!-- תצוגת הספר -->
+    <div class="card hidden" id="book-card">
+        <h2 id="book-title"></h2>
+        <div class="row" style="margin-bottom:12px">
+            <input type="text" id="q" placeholder="חיפוש מסמך…" style="min-width:200px">
+            <label class="muted">מ־<input type="date" id="from"></label>
+            <label class="muted">עד<input type="date" id="to"></label>
+            <select id="divider-filter"><option value="">כל החוצצים</option></select>
+            <button class="btn-light btn-sm" onclick="L.loadDocuments()">חיפוש</button>
+            <button class="btn-light btn-sm" onclick="L.clearSearch()">נקה</button>
+            <span style="flex:1"></span>
+            <button class="btn-light btn-sm" onclick="L.openDividers()">חוצצים</button>
+            <button class="btn-primary" onclick="document.getElementById('file-input').click()">⬆ העלאת מסמך</button>
+            <input type="file" id="file-input" class="hidden"
+                   accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif,.webp,.gif" onchange="L.upload(this)">
+        </div>
+        <div id="upload-status" class="muted"></div>
+        <div id="documents"></div>
+    </div>
+</div>
+
+<!-- דיאלוג: חברה חדשה -->
+<dialog id="dlg-company"><div class="dlg-body">
+    <h3>חברה חדשה</h3>
+    <div class="field"><label>שם החברה</label><input type="text" id="nc-name"></div>
+    <div class="field"><label>ח.פ / ע.מ (לא חובה)</label><input type="text" id="nc-tax"></div>
+    <div class="row" style="justify-content:flex-end">
+        <button class="btn-light" onclick="document.getElementById('dlg-company').close()">ביטול</button>
+        <button class="btn-ok" onclick="L.createCompany()">צור</button>
+    </div>
+</div></dialog>
+
+<!-- דיאלוג: ספר חדש -->
+<dialog id="dlg-book"><div class="dlg-body">
+    <h3>ספר חדש (שנה)</h3>
+    <div class="field"><label>שנה</label><input type="number" id="nb-year" min="2000" max="2100"></div>
+    <div class="row" style="justify-content:flex-end">
+        <button class="btn-light" onclick="document.getElementById('dlg-book').close()">ביטול</button>
+        <button class="btn-ok" onclick="L.createBook()">צור</button>
+    </div>
+</div></dialog>
+
+<!-- דיאלוג: חוצצים -->
+<dialog id="dlg-dividers"><div class="dlg-body">
+    <h3>חוצצים</h3>
+    <div id="dividers-list"></div>
+    <div class="row" style="margin-top:10px">
+        <input type="text" id="nd-name" placeholder="שם חוצץ חדש" style="flex:1">
+        <button class="btn-ok btn-sm" onclick="L.addDivider()">הוסף</button>
+    </div>
+    <div class="row" style="justify-content:flex-end; margin-top:14px">
+        <button class="btn-light" onclick="document.getElementById('dlg-dividers').close()">סגור</button>
+    </div>
+</div></dialog>
+
+<!-- דיאלוג: עריכת מסמך -->
+<dialog id="dlg-doc"><div class="dlg-body">
+    <h3>עריכת מסמך</h3>
+    <div class="field"><label>כותרת</label><input type="text" id="ed-title"></div>
+    <div class="field"><label>תאריך המסמך</label><input type="date" id="ed-date">
+        <span id="ed-datesrc" class="muted"></span></div>
+    <div class="field"><label>קטגוריה 1 (לא חובה)</label>
+        <input type="text" id="ed-cat1" list="cat-list"></div>
+    <div class="field"><label>קטגוריה 2 (לא חובה)</label>
+        <input type="text" id="ed-cat2" list="cat-list"></div>
+    <div class="field"><label>חוצץ (לא חובה)</label><select id="ed-divider"></select></div>
+    <datalist id="cat-list"></datalist>
+    <div class="row" style="justify-content:space-between">
+        <button class="btn-danger btn-sm" onclick="L.deleteDoc()">מחק מסמך</button>
+        <span>
+            <button class="btn-light" onclick="document.getElementById('dlg-doc').close()">ביטול</button>
+            <button class="btn-primary" onclick="L.saveDoc()">שמור</button>
+        </span>
+    </div>
+</div></dialog>
+
+<div id="toast"></div>
+<script src="/static/js/ledger.js"></script>
+</body>
+</html>
