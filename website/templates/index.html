@@ -29,6 +29,8 @@
             <a id="admin-link" href="/admin/users" style="display:none">ניהול משתמשים</a>
         </nav>
         <span class="tact-account">
+            <button id="btn-sync" class="btn btn-secondary btn-sm" onclick="app.syncPriority()">סנכרון Priority</button>
+            <span id="sync-status" class="sync-badge">לא סונכרן</span>
             <span id="current-user" class="tact-chip"></span>
             <a href="/logout" class="tact-logout">התנתק</a>
         </span>
@@ -49,10 +51,6 @@
                     <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif" hidden>
                 </label>
                 <span class="drop-zone-hint">PDF, PNG, JPG, TIFF</span>
-            </div>
-            <div class="sync-controls" style="display:flex;gap:10px;align-items:center;margin-top:8px">
-                <button id="btn-sync" class="btn btn-secondary btn-sm" onclick="app.syncPriority()">סנכרון Priority</button>
-                <span id="sync-status" class="sync-badge">לא סונכרן</span>
             </div>
         </section>
 
@@ -182,7 +180,7 @@
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/js/app.js?v=tx1"></script>
+    <script src="/static/js/app.js?v=tx2"></script>
     <script src="/static/js/tact-header.js"></script>
 </body>
 </html>

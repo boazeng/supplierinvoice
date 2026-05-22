@@ -871,10 +871,11 @@ const app = {
         btn.textContent = 'מסנכרן...';
 
         try {
-            const res = await fetch('/api/sync/priority', { method: 'POST' });
+            // /api/db/sync — מסנכרן ספקים, לקוחות ותתי-חברות (סניפים) ל-DB
+            const res = await fetch('/api/db/sync', { method: 'POST' });
             const data = await res.json();
             this.showToast(
-                `סנכרון הושלם — ${data.suppliers_count} ספקים, ${data.parts_count} פריטים`,
+                `סנכרון הושלם — ${data.suppliers_synced} ספקים, ${data.customers_synced} לקוחות, ${data.branches_synced || 0} תתי-חברות`,
                 'success'
             );
             this.loadSyncStatus();
