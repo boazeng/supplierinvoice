@@ -12,6 +12,7 @@ from typing import Optional
 
 class InvoiceStatus(str, Enum):
     PENDING = "pending"
+    PENDING_EXTRACTION = "pending_extraction"   # נקלט ממייל — ממתין לאישור לפענוח
     PROCESSING = "processing"
     REVIEW = "review"
     SUBMITTED = "submitted"

@@ -324,6 +324,7 @@ body {
 }
 
 .status-pending    { background: #9B948620; color: #706A60; }
+.status-pending_extraction { background: #B07D2B1f; color: #8A5F1E; }
 .status-processing { background: #1F3A5F18; color: #1F3A5F; }
 .status-review     { background: #B07D2B1f; color: #8A5F1E; }
 .status-submitted  { background: #2F8F5B1f; color: #2F8F5B; }

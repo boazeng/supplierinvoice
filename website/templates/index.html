@@ -6,7 +6,7 @@
     <title>קליטת חשבוניות ספק</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/main.css?v=tact1">
+    <link rel="stylesheet" href="/static/css/main.css?v=tact2">
     <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
 </head>
 <body>
@@ -52,11 +52,14 @@
                 </label>
                 <span class="drop-zone-hint">PDF, PNG, JPG, TIFF</span>
             </div>
+            <button id="btn-fetch-email" class="btn btn-secondary btn-sm" style="margin-top:8px"
+                    onclick="app.fetchEmail()">📧 משוך חשבוניות ממייל</button>
         </section>
 
         <!-- Status Filter Tabs -->
         <section class="filter-tabs">
             <button class="tab active" data-status="" onclick="app.filterByStatus(this, '')">הכל</button>
+            <button class="tab" data-status="pending_extraction" onclick="app.filterByStatus(this, 'pending_extraction')">ממתין לפענוח</button>
             <button class="tab" data-status="review" onclick="app.filterByStatus(this, 'review')">ממתינות לבקרה</button>
             <button class="tab" data-status="processing" onclick="app.filterByStatus(this, 'processing')">בעיבוד</button>
             <button class="tab" data-status="submitted" onclick="app.filterByStatus(this, 'submitted')">נקלטו</button>
@@ -91,6 +94,9 @@
                 <div class="modal-toolbar">
                     <h3 style="font-size:0.95rem;font-weight:600;margin:0">פרטי חשבונית</h3>
                     <div style="display:flex;align-items:center;gap:10px">
+                        <!-- Extract button (visible only when status=pending_extraction) -->
+                        <button id="btn-extract" class="btn btn-primary btn-sm" style="display:none"
+                                onclick="app.extractInvoice()">פענח</button>
                         <!-- Action Buttons (visible only when status=review) -->
                         <div id="action-buttons" class="action-buttons">
                             <button class="btn btn-success btn-sm" onclick="app.approveInvoice()">
@@ -180,7 +186,7 @@
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/js/app.js?v=tx3"></script>
+    <script src="/static/js/app.js?v=tx4"></script>
     <script src="/static/js/tact-header.js"></script>
 </body>
 </html>

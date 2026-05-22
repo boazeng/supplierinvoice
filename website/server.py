@@ -190,6 +190,57 @@ async def upload_invoice(file: UploadFile = File(...)):
     }
 
 
+@app.post("/api/invoices/fetch-email")
+async def fetch_email_invoices():
+    """משיכה ידנית של חשבוניות מתיבת המייל הייעודית.
+
+    כל קובץ מצורף נכנס לבנק החשבוניות בסטטוס 'ממתין לאישור לפענוח'.
+    """
+    import asyncio
+    from tools.email_reader import fetch_invoice_attachments, inbox_configured
+
+    if not inbox_configured():
+        raise HTTPException(status_code=400, detail="תיבת המייל לא הוגדרה עדיין")
+
+    try:
+        attachments = await asyncio.to_thread(fetch_invoice_attachments)
+    except Exception as e:  # noqa: BLE001
+        logger.error("שגיאה במשיכה מהמייל: %s", e)
+        raise HTTPException(status_code=502, detail=f"שגיאה במשיכה מהמייל: {e}")
+
+    created = 0
+    for att in attachments:
+        ext = Path(att["filename"]).suffix.lower()
+        file_id = str(uuid.uuid4())
+        save_path = INVOICES_DIR / f"{file_id}{ext}"
+        with open(save_path, "wb") as f:
+            f.write(att["content"])
+        invoice = Invoice(
+            id=file_id,
+            source=InvoiceSource.EMAIL,
+            file_path=str(save_path),
+            file_type="pdf" if ext == ".pdf" else "image",
+            status=InvoiceStatus.PENDING_EXTRACTION,
+        )
+        store.save(invoice)
+        created += 1
+        logger.info("חשבונית מהמייל נקלטה: %s (%s)", att["filename"], att.get("from", ""))
+
+    logger.info("נמשכו %d חשבוניות מהמייל", created)
+    return {"fetched": created}
+
+
+@app.post("/api/invoices/{invoice_id}/extract")
+async def extract_invoice_api(invoice_id: str):
+    """מפעיל פענוח על חשבונית שממתינה לאישור לפענוח (נקלטה ממייל)."""
+    invoice = store.get(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+    orchestrator.start_background_processing(invoice_id)
+    logger.info("פענוח הופעל ידנית לחשבונית %s", invoice_id)
+    return {"id": invoice_id, "status": "processing", "message": "הפענוח החל"}
+
+
 @app.post("/api/invoices/{invoice_id}/ocr-crop")
 async def ocr_crop_api(invoice_id: str, body: dict = {}):
     """OCR על אזור חתוך — לבדיקה."""

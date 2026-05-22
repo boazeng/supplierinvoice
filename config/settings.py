@@ -36,6 +36,12 @@ EMAIL_USER: str = os.getenv("GMAIL_USER", "")
 EMAIL_PASS: str = os.getenv("GMAIL_APP_PASSWORD", "")
 EMAIL_FOLDER: str = os.getenv("EMAIL_FOLDER", "INBOX")
 
+# --- תיבת מייל ייעודית לקליטת חשבוניות (IMAP) ---
+INVOICE_INBOX_USER: str = os.getenv("INVOICE_INBOX_USER", "")
+INVOICE_INBOX_APP_PASSWORD: str = os.getenv("INVOICE_INBOX_APP_PASSWORD", "")
+INVOICE_INBOX_HOST: str = os.getenv("INVOICE_INBOX_HOST", "imap.gmail.com")
+INVOICE_INBOX_PORT: int = int(os.getenv("INVOICE_INBOX_PORT", "993"))
+
 # --- נתיבים ---
 DATA_DIR: Path = BASE_DIR / "data"
 INVOICES_DIR: Path = DATA_DIR / "invoices"

@@ -95,6 +95,7 @@ const app = {
 
         const statusLabels = {
             pending: 'ממתין',
+            pending_extraction: 'ממתין לפענוח',
             processing: 'בעיבוד',
             review: 'לבקרה',
             submitted: 'נקלט',
@@ -324,17 +325,25 @@ const app = {
         // Notes
         document.getElementById('user-notes').value = inv.user_notes || '';
 
-        // Action buttons vs status display
+        // Action buttons / extract button / status display
         const actionBtns = document.getElementById('action-buttons');
         const statusDisplay = document.getElementById('status-display');
+        const extractBtn = document.getElementById('btn-extract');
 
         if (inv.status === 'review') {
             actionBtns.style.display = 'flex';
+            if (extractBtn) extractBtn.style.display = 'none';
+            statusDisplay.style.display = 'none';
+        } else if (inv.status === 'pending_extraction') {
+            actionBtns.style.display = 'none';
+            if (extractBtn) extractBtn.style.display = '';
             statusDisplay.style.display = 'none';
         } else {
             actionBtns.style.display = 'none';
+            if (extractBtn) extractBtn.style.display = 'none';
             const statusMessages = {
                 pending: 'ממתין לעיבוד',
+                pending_extraction: 'ממתין לאישור לפענוח',
                 processing: 'בעיבוד...',
                 submitted: `נקלט בפריורטי — ${inv.priority_invoice_id || ''}`,
                 rejected: `נדחה — ${inv.user_notes || ''}`,
@@ -888,6 +897,55 @@ const app = {
         } finally {
             btn.disabled = false;
             btn.textContent = 'סנכרון Priority';
+        }
+    },
+
+    // משיכה ידנית של חשבוניות מתיבת המייל הייעודית
+    async fetchEmail() {
+        const btn = document.getElementById('btn-fetch-email');
+        const orig = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ מושך…';
+        try {
+            const res = await fetch('/api/invoices/fetch-email', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                this.showToast(data.fetched > 0
+                    ? `נמשכו ${data.fetched} חשבוניות מהמייל — ממתינות לפענוח`
+                    : 'אין חשבוניות חדשות במייל', data.fetched > 0 ? 'success' : 'info');
+                this.loadInvoices();
+            } else {
+                this.showToast(data.detail || 'שגיאה במשיכה מהמייל', 'error');
+            }
+        } catch (err) {
+            this.showToast('שגיאת תקשורת', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = orig;
+        }
+    },
+
+    // הפעלת פענוח על חשבונית שממתינה לפענוח (נקלטה ממייל)
+    async extractInvoice() {
+        if (!this.currentInvoice) return;
+        const btn = document.getElementById('btn-extract');
+        btn.disabled = true;
+        btn.textContent = '⏳ מפענח…';
+        try {
+            const res = await fetch(`/api/invoices/${this.currentInvoice.id}/extract`, { method: 'POST' });
+            if (res.ok) {
+                this.showToast('הפענוח החל', 'success');
+                this.closeModal();
+                this.loadInvoices();
+            } else {
+                const d = await res.json().catch(() => ({}));
+                this.showToast(d.detail || 'שגיאה בהפעלת פענוח', 'error');
+            }
+        } catch (err) {
+            this.showToast('שגיאת תקשורת', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'פענח';
         }
     },
 

@@ -1,103 +1,95 @@
-"""
-EmailReader — קריאת חשבוניות מ-IMAP (אופציונלי)
+"""קורא מייל — משיכת חשבוניות מתיבת ה-IMAP הייעודית.
+
+משתמש בספריות התקן imaplib + email בלבד (ללא תלויות חיצוניות).
+מוגדר דרך INVOICE_INBOX_* ב-env (תיבה ייעודית לחשבוניות בלבד).
 """
 import email
 import imaplib
 import logging
-import os
 from email.header import decode_header
-from pathlib import Path
-from typing import Optional
 
 from config.settings import (
-    EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FOLDER, INVOICES_DIR,
+    INVOICE_INBOX_USER,
+    INVOICE_INBOX_APP_PASSWORD,
+    INVOICE_INBOX_HOST,
+    INVOICE_INBOX_PORT,
 )
 
-logger = logging.getLogger("כלים.אימייל")
+logger = logging.getLogger("כלים.מייל")
+
+_ALLOWED_EXT = (".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".webp", ".gif")
 
 
-class EmailReader:
-    """קורא חשבוניות מצורפות מתיבת אימייל."""
+def inbox_configured() -> bool:
+    """האם הוגדרו פרטי תיבת המייל הייעודית."""
+    return bool(INVOICE_INBOX_USER and INVOICE_INBOX_APP_PASSWORD)
 
-    def __init__(self) -> None:
-        self.host = EMAIL_HOST
-        self.port = EMAIL_PORT
-        self.user = EMAIL_USER
-        self.password = EMAIL_PASS
-        self.folder = EMAIL_FOLDER
 
-    def is_configured(self) -> bool:
-        """בודק אם הגדרות האימייל קיימות."""
-        return bool(self.host and self.user and self.password)
+def _decode_header(value: str) -> str:
+    """פענוח כותרת מייל מקודדת (לדוגמה שם קובץ בעברית)."""
+    out = ""
+    for text, enc in decode_header(value or ""):
+        if isinstance(text, bytes):
+            out += text.decode(enc or "utf-8", errors="replace")
+        else:
+            out += text
+    return out
 
-    async def fetch_invoices(self) -> list[str]:
-        """
-        מתחבר ל-IMAP, מחפש הודעות עם קבצים מצורפים,
-        ושומר קבצי PDF/תמונה לתיקיית invoices.
-        מחזיר רשימת נתיבים של קבצים שנשמרו.
-        """
-        if not self.is_configured():
-            logger.warning("הגדרות אימייל חסרות — מדלג")
+
+def fetch_invoice_attachments() -> list[dict]:
+    """מתחבר לתיבה, מושך הודעות שלא נקראו ומחזיר את הקבצים המצורפים.
+
+    כל פריט: {"filename": str, "content": bytes, "from": str}.
+    ההודעות שנמשכו מסומנות כ"נקראו" — כך שמשיכה חוזרת לא תכפיל אותן.
+    """
+    if not inbox_configured():
+        raise RuntimeError(
+            "תיבת המייל לא הוגדרה — חסרים INVOICE_INBOX_USER / INVOICE_INBOX_APP_PASSWORD"
+        )
+
+    attachments: list[dict] = []
+    conn = imaplib.IMAP4_SSL(INVOICE_INBOX_HOST, INVOICE_INBOX_PORT)
+    try:
+        conn.login(INVOICE_INBOX_USER, INVOICE_INBOX_APP_PASSWORD)
+        conn.select("INBOX")
+        status, data = conn.search(None, "UNSEEN")
+        if status != "OK":
             return []
+        msg_ids = data[0].split()
+        logger.info("נמצאו %d הודעות חדשות בתיבה", len(msg_ids))
 
-        logger.info("מתחבר ל-%s...", self.host)
-        saved_files: list[str] = []
+        for msg_id in msg_ids:
+            # שליפת ההודעה (FETCH של RFC822 מסמן אותה אוטומטית כ"נקראה")
+            status, msg_data = conn.fetch(msg_id, "(RFC822)")
+            if status != "OK" or not msg_data or not msg_data[0]:
+                continue
+            msg = email.message_from_bytes(msg_data[0][1])
+            sender = _decode_header(msg.get("From", ""))
 
-        try:
-            mail = imaplib.IMAP4_SSL(self.host, self.port)
-            mail.login(self.user, self.password)
-            mail.select(self.folder)
-
-            # חיפוש הודעות שלא נקראו
-            status, messages = mail.search(None, "UNSEEN")
-            if status != "OK":
-                logger.warning("לא הצלחתי לחפש הודעות")
-                return []
-
-            message_ids = messages[0].split()
-            logger.info("נמצאו %d הודעות חדשות", len(message_ids))
-
-            for msg_id in message_ids:
-                status, msg_data = mail.fetch(msg_id, "(RFC822)")
-                if status != "OK":
+            for part in msg.walk():
+                if part.get_content_disposition() != "attachment":
                     continue
+                filename = part.get_filename()
+                if not filename:
+                    continue
+                filename = _decode_header(filename)
+                if not filename.lower().endswith(_ALLOWED_EXT):
+                    continue
+                payload = part.get_payload(decode=True)
+                if payload:
+                    attachments.append(
+                        {"filename": filename, "content": payload, "from": sender}
+                    )
 
-                msg = email.message_from_bytes(msg_data[0][1])
-
-                for part in msg.walk():
-                    if part.get_content_maintype() == "multipart":
-                        continue
-
-                    filename = part.get_filename()
-                    if not filename:
-                        continue
-
-                    # פענוח שם הקובץ
-                    decoded, charset = decode_header(filename)[0]
-                    if isinstance(decoded, bytes):
-                        filename = decoded.decode(charset or "utf-8")
-
-                    # בדיקה שזה קובץ רלוונטי
-                    ext = Path(filename).suffix.lower()
-                    if ext not in (".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif"):
-                        continue
-
-                    # שמירה
-                    save_path = INVOICES_DIR / filename
-                    counter = 1
-                    while save_path.exists():
-                        save_path = INVOICES_DIR / f"{Path(filename).stem}_{counter}{ext}"
-                        counter += 1
-
-                    with open(save_path, "wb") as f:
-                        f.write(part.get_payload(decode=True))
-
-                    saved_files.append(str(save_path))
-                    logger.info("נשמר קובץ מאימייל: %s", save_path.name)
-
-            mail.logout()
-
-        except Exception as e:
-            logger.error("שגיאה בקריאת אימייל: %s", e)
-
-        return saved_files
+        logger.info("חולצו %d קבצים מצורפים מ-%d הודעות",
+                    len(attachments), len(msg_ids))
+    finally:
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            conn.logout()
+        except Exception:  # noqa: BLE001
+            pass
+    return attachments
