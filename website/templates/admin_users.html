@@ -46,7 +46,7 @@
     <div class="card">
         <h3 style="margin-top:0">משתמשים מורשים</h3>
         <table>
-            <thead><tr><th>אימייל</th><th>שם</th><th>תפקיד</th><th>פעיל</th><th></th></tr></thead>
+            <thead><tr><th>אימייל</th><th>כינוי</th><th>תפקיד</th><th>פעיל</th><th></th></tr></thead>
             <tbody id="users-body"></tbody>
         </table>
     </div>
@@ -55,7 +55,7 @@
         <h3 style="margin-top:0">הוספת משתמש</h3>
         <div class="row-form">
             <input id="new-email" type="email" placeholder="אימייל Gmail" style="flex:2">
-            <input id="new-name" type="text" placeholder="שם (לא חובה)" style="flex:1">
+            <input id="new-name" type="text" placeholder="כינוי (לא חובה)" style="flex:1">
             <select id="new-role"></select>
             <button class="btn-add" onclick="addUser()">הוסף</button>
         </div>
@@ -89,7 +89,7 @@ async function load() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${u.email}</td>
-            <td><input value="${(u.name || '').replace(/"/g, '&quot;')}" data-f="name" style="width:120px"></td>
+            <td><input value="${(u.name || '').replace(/"/g, '&quot;')}" data-f="name" placeholder="כינוי" style="width:120px"></td>
             <td><select data-f="role">${roleSelect(u.role)}</select></td>
             <td style="text-align:center"><input type="checkbox" data-f="active"${u.active ? ' checked' : ''}></td>
             <td>

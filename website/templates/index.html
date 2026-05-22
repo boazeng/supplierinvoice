@@ -170,7 +170,8 @@
         // הצגת המשתמש המחובר + קישור ניהול ל-admin
         fetch('/auth/me').then(r => r.json()).then(u => {
             if (u && u.email) {
-                document.getElementById('current-user').textContent = '👤 ' + u.email;
+                // הצגת הכינוי אם הוגדר, אחרת המייל
+                document.getElementById('current-user').textContent = '👤 ' + (u.name || u.email);
                 if (u.role === 'admin') document.getElementById('admin-link').style.display = '';
             }
         }).catch(() => {});
