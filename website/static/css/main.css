@@ -1,22 +1,24 @@
-/* === SupplierInvoice — RTL + Light Blue Theme === */
+/* === SupplierInvoice — TACT brand design system === */
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 :root {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f0f4f8;
-    --bg-card: #ffffff;
-    --bg-hover: #e8eef6;
-    --bg-tertiary: #f0f4f8;
-    --text-primary: #1a2a3a;
-    --text-secondary: #4a5f78;
-    --text-muted: #8899aa;
-    --accent: #2563eb;
-    --accent-hover: #3b82f6;
-    --success: #16a34a;
-    --danger: #dc2626;
-    --warning: #f59e0b;
-    --border: #d0dbe8;
+    /* TACT palette — steel-blue structural · rust accent · warm cream */
+    --bg-primary: #FAF9F5;       /* warm cream — page */
+    --bg-secondary: #F1EFE8;     /* warm tint — nested surfaces */
+    --bg-card: #FFFEFB;          /* warm white — cards */
+    --bg-hover: #ECE8DC;         /* warm hover */
+    --bg-tertiary: #F1EFE8;
+    --text-primary: #2A2A28;     /* warm dark ink (not pure black) */
+    --text-secondary: #706A60;   /* taupe */
+    --text-muted: #9B9486;       /* warm muted */
+    --accent: #1F3A5F;           /* steel-blue — structural */
+    --accent-hover: #2A4F7A;
+    --success: #2F8F5B;          /* TACT green — positive */
+    --danger: #D64A2E;           /* rust — negative / danger */
+    --warning: #B07D2B;          /* derived warm amber */
+    --border: #E7E2D6;           /* warm beige */
     --radius: 8px;
-    --shadow: 0 2px 12px rgba(37, 99, 235, 0.08);
+    --shadow: 0 4px 12px rgba(28, 27, 25, 0.06);
 }
 
 * {
@@ -26,8 +28,12 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, sans-serif;
+    font-family: 'Heebo', 'Assistant', 'Segoe UI', Tahoma, sans-serif;
     background: var(--bg-primary);
+    background-image:
+        radial-gradient(ellipse 60% 50% at 100% 0%, rgba(31, 58, 95, 0.06), transparent 70%),
+        radial-gradient(ellipse 55% 50% at 0% 100%, rgba(31, 58, 95, 0.05), transparent 70%);
+    background-attachment: fixed;
     color: var(--text-primary);
     direction: rtl;
     min-height: 100vh;
@@ -35,7 +41,7 @@ body {
 
 /* === Header === */
 .header {
-    background: linear-gradient(135deg, #1e40af, #2563eb);
+    background: linear-gradient(135deg, #1F3A5F, #2A4F7A);
     border-bottom: 1px solid var(--border);
     padding: 14px 24px;
     position: sticky;
@@ -208,8 +214,8 @@ body {
 }
 
 .invoice-table thead th {
-    background: #edf2f7;
-    color: #1e40af;
+    background: #F1EFE8;
+    color: var(--accent);
     font-weight: 600;
     font-size: 0.8rem;
     padding: 10px 14px;
@@ -317,12 +323,12 @@ body {
     font-weight: 500;
 }
 
-.status-pending    { background: #94a3b820; color: #64748b; }
-.status-processing { background: #2563eb18; color: #2563eb; }
-.status-review     { background: #f59e0b18; color: #b45309; }
-.status-submitted  { background: #16a34a18; color: #16a34a; }
-.status-rejected   { background: #dc262618; color: #dc2626; }
-.status-error      { background: #dc262618; color: #dc2626; }
+.status-pending    { background: #9B948620; color: #706A60; }
+.status-processing { background: #1F3A5F18; color: #1F3A5F; }
+.status-review     { background: #B07D2B1f; color: #8A5F1E; }
+.status-submitted  { background: #2F8F5B1f; color: #2F8F5B; }
+.status-rejected   { background: #D64A2E18; color: #D64A2E; }
+.status-error      { background: #D64A2E18; color: #D64A2E; }
 
 /* === Modal === */
 .modal {
