@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -44,7 +44,7 @@ auth = install_auth(
         {"email": "boazen@gmail.com", "role": "admin"},
         {"email": "boen01@gmail.com", "role": "admin"},
     ],
-    public_prefixes=("/api/health",),
+    public_prefixes=("/api/health", "/api/cron/"),
 )
 
 # --- מערכת ספרי הנהלת חשבונות ---
@@ -188,12 +188,8 @@ async def upload_invoice(file: UploadFile = File(...)):
     }
 
 
-@app.post("/api/invoices/fetch-email")
-async def fetch_email_invoices():
-    """משיכה ידנית של חשבוניות מתיבת המייל הייעודית.
-
-    כל קובץ מצורף נכנס לבנק החשבוניות בסטטוס 'ממתין לאישור לפענוח'.
-    """
+async def _fetch_and_store_email_invoices() -> dict:
+    """לוגיקה משותפת — מושך את המייל ויוצר רשומות חשבונית בסטטוס 'ממתין לאישור'."""
     import asyncio
     from tools.email_reader import fetch_invoice_attachments, inbox_configured
 
@@ -224,8 +220,26 @@ async def fetch_email_invoices():
         created += 1
         logger.info("חשבונית מהמייל נקלטה: %s (%s)", att["filename"], att.get("from", ""))
 
-    logger.info("נמשכו %d חשבוניות מהמייל", created)
+    if created:
+        logger.info("נמשכו %d חשבוניות מהמייל", created)
     return {"fetched": created}
+
+
+@app.post("/api/invoices/fetch-email")
+async def fetch_email_invoices():
+    """משיכה ידנית של חשבוניות מתיבת המייל הייעודית — דורש משתמש מחובר."""
+    return await _fetch_and_store_email_invoices()
+
+
+@app.post("/api/cron/fetch-email")
+async def cron_fetch_email(request: Request):
+    """משיכה אוטומטית של חשבוניות מהמייל — מופעל על-ידי systemd timer בשרת.
+    דורש כותרת X-Cron-Token התואמת ל-AUTH_EMERGENCY_TOKEN."""
+    import os
+    expected = os.getenv("AUTH_EMERGENCY_TOKEN", "")
+    if not expected or request.headers.get("X-Cron-Token", "") != expected:
+        raise HTTPException(status_code=403, detail="forbidden")
+    return await _fetch_and_store_email_invoices()
 
 
 @app.post("/api/invoices/{invoice_id}/extract")
