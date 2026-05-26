@@ -129,9 +129,9 @@ class PriorityClient:
     # --- חשבוניות ---
 
     async def submit_invoice(self, invoice_data: dict) -> dict:
-        """קליטת חשבונית ספק ב-Priority (POST ל-AINVOICES)."""
+        """קליטת חשבונית ספק ב-Priority (POST ל-PINVOICES)."""
         logger.info("שולח חשבונית לפריורטי: %s", invoice_data.get("IVNUM", ""))
-        return await self._post("AINVOICES", invoice_data)
+        return await self._post("PINVOICES", invoice_data)
 
     # --- בדיקת חיבור ---
 

@@ -12,28 +12,35 @@ logger = logging.getLogger("פריורטי.קליטה")
 
 
 def _build_priority_payload(data: InvoiceData) -> dict:
-    """בונה את ה-payload לקליטה ב-AINVOICES לפי מבנה OData של Priority."""
-    # שורות חשבונית
-    details = []
-    for line in data.lines:
-        detail = {
-            "PARTNAME": line.priority_part_name or line.catalog_number,
-            "TQUANT": line.quantity,
-            "TPRICE": line.unit_price,
-            "VATPRICE": line.vat_amount,
-        }
-        details.append(detail)
+    """בונה את ה-payload לקליטה ב-PINVOICES לפי מבנה OData של Priority."""
+    # תיאור — מחרוזת שורות החשבונית, או שם הספק אם אין שורות
+    if data.lines:
+        pdes = "; ".join(ln.description for ln in data.lines if ln.description)[:100]
+    else:
+        pdes = data.supplier.name or "חשבונית ספק"
+
+    item = {
+        "PARTNAME": "000",
+        "PDES": pdes,
+        "TQUANT": 1,
+        "TPRICE": data.subtotal,
+        "DEBIT": data.total_amount,
+    }
+    if data.expense_account:
+        item["ACCOUNT"] = data.expense_account
 
     payload = {
         "IVNUM": data.invoice_number,
         "IVDATE": data.invoice_date,
         "SUPNAME": data.supplier.priority_supplier_code,
-        "DETAILS_SUBFORM": details,
+        "PINVOICEITEMS": [item],
     }
 
-    # הוספת הזמנת רכש אם קיימת
-    if data.purchase_order:
-        payload["ORDNAME"] = data.purchase_order
+    if data.customer.branch:
+        payload["BRANCHNAME"] = data.customer.branch
+
+    if data.allocation_number:
+        payload["IVMIVNUM"] = data.allocation_number
 
     return payload
 
@@ -45,7 +52,7 @@ async def submit_approved_invoice(
 ) -> Invoice:
     """
     שולח חשבונית מאושרת לפריורטי.
-    מעדכן את הסטטוס ל-SUBMITTED או ERROR.
+    מעדכן את הסטטוס ל-PENDING_FILING או משאיר ב-PENDING_SUBMISSION בשגיאה.
     """
     if not invoice.extracted_data:
         raise ValueError("אין נתונים מנותחים לחשבונית")
@@ -64,15 +71,10 @@ async def submit_approved_invoice(
     try:
         result = await priority_client.submit_invoice(payload)
         invoice.priority_invoice_id = result.get("IVNUM", "")
-        # נקלט בפריורטי → ממתין לתיוק בספרי הנהלת חשבונות
         invoice.status = InvoiceStatus.PENDING_FILING
         invoice.error_message = ""
-        logger.info(
-            "חשבונית נקלטה בפריורטי בהצלחה — IVNUM: %s",
-            invoice.priority_invoice_id,
-        )
+        logger.info("חשבונית נקלטה בפריורטי בהצלחה — IVNUM: %s", invoice.priority_invoice_id)
     except Exception as e:
-        # קליטה נכשלה → נשאר "ממתין לקליטה" לניסיון חוזר
         invoice.status = InvoiceStatus.PENDING_SUBMISSION
         invoice.error_message = f"שגיאה בקליטה בפריורטי: {e}"
         logger.error("שגיאה בקליטה: %s", e)
