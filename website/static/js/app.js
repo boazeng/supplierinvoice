@@ -352,7 +352,6 @@ const app = {
         actionBtns.style.display = 'flex';
         showBtn('btn-approve-intake', s === 'pending_approval');
         showBtn('btn-extract', s === 'pending_extraction');
-        showBtn('btn-check', s === 'pending_submission');
         showBtn('btn-submit', s === 'pending_submission');
         showBtn('btn-restore', s === 'on_hold' || s === 'cancelled');
         showBtn('btn-hold', s !== 'on_hold' && s !== 'cancelled');
@@ -1056,52 +1055,6 @@ const app = {
     },
 
     // === בדיקה לפני קליטה ===
-    checkInvoice() {
-        const inv = this.currentInvoice;
-        const d = inv && inv.extracted_data;
-        if (!d) { this.showToast('אין נתונים לבדיקה', 'error'); return; }
-
-        const branch = (d.customer?.branch || '').trim();
-        const expenseAcc = (d.expense_account || '').trim();
-        const supplierCode = (d.supplier?.priority_supplier_code || '').trim();
-        const invoiceNum = (d.invoice_number || '').trim();
-        const invoiceDate = (d.invoice_date || '').trim();
-        const total = parseFloat(d.total_amount) || 0;
-        const subtotal = parseFloat(d.subtotal) || 0;
-        const vat = parseFloat(d.vat_amount) || 0;
-        const totalOk = Math.abs(subtotal + vat - total) < 0.5;
-
-        const checks = [
-            { label: 'ספק מזוהה בפריורטי', ok: !!supplierCode, detail: supplierCode || '—' },
-            { label: 'קוד סניף', ok: !!branch, detail: branch || 'חסר' },
-            { label: 'חשבון הוצאות', ok: !!expenseAcc, detail: expenseAcc || 'חסר' },
-            { label: 'מספר חשבונית', ok: !!invoiceNum, detail: invoiceNum || 'חסר' },
-            { label: 'תאריך חשבונית', ok: !!invoiceDate, detail: invoiceDate || 'חסר' },
-            { label: 'סכום כולל מע"מ', ok: total > 0, detail: total > 0 ? `₪${total.toLocaleString()}` : 'חסר' },
-            { label: 'סכומים מאוזנים', ok: totalOk, detail: totalOk ? '✓' : `${subtotal} + ${vat} ≠ ${total}` },
-        ];
-
-        const allOk = checks.every(c => c.ok);
-        const box = document.getElementById('transaction-preview');
-
-        box.innerHTML = `
-            <h4 style="margin:0 0 10px;color:var(--accent)">🔍 בדיקה לפני קליטה</h4>
-            <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
-                ${checks.map(c => `
-                    <tr style="border-bottom:1px solid var(--border)">
-                        <td style="padding:5px 8px;color:${c.ok ? 'var(--success)' : 'var(--danger)'}">
-                            ${c.ok ? '✓' : '✗'}
-                        </td>
-                        <td style="padding:5px 8px;font-weight:600">${c.label}</td>
-                        <td style="padding:5px 8px;color:var(--text-secondary);direction:ltr;text-align:right">${c.detail}</td>
-                    </tr>`).join('')}
-            </table>
-            <div style="margin-top:10px;font-weight:700;font-size:0.9rem;color:${allOk ? 'var(--success)' : 'var(--danger)'}">
-                ${allOk ? '✓ החשבונית מוכנה לקליטה' : '⚠ יש שדות חסרים — יש להשלים לפני הקליטה'}
-            </div>`;
-        box.style.display = 'block';
-    },
-
     // === Autocomplete ===
     _setupAcFields(container) {
         container.querySelectorAll('.ac-input').forEach(input => {
