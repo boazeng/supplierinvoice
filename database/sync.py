@@ -139,17 +139,38 @@ async def sync_branches(client: PriorityClient) -> int:
     return count
 
 
+async def sync_accounts(client: PriorityClient) -> int:
+    """מסנכרן חשבונות GL מפריורטי ל-DB."""
+    logger.info("מתחיל סנכרון חשבונות...")
+    result = await client._get("ACCOUNTS", params={
+        "$select": "ACCOUNT,ACCOUNTDES",
+        "$top": "2000",
+    })
+    if not result or not result.get("value"):
+        logger.warning("ACCOUNTS לא זמין או ריק — דילוג")
+        return 0
+
+    records = [
+        {"account_code": a["ACCOUNT"], "account_name": a.get("ACCOUNTDES", "")}
+        for a in result["value"] if a.get("ACCOUNT")
+    ]
+    count = db.bulk_upsert_accounts(records)
+    logger.info("סנכרון חשבונות הושלם — סה\"כ %d", count)
+    return count
+
+
 async def sync_all() -> dict:
-    """סנכרון מלא — ספקים, לקוחות, תתי חברות."""
+    """סנכרון מלא — ספקים, לקוחות, תתי חברות, חשבונות."""
     client = PriorityClient()
     try:
         suppliers = await sync_suppliers(client)
         customers = await sync_customers(client)
         branches = await sync_branches(client)
+        accounts = await sync_accounts(client)
         db.update_sync_status(suppliers, customers, branches)
         stats = db.get_stats()
         logger.info("סנכרון מלא הושלם: %s", stats)
         return {"suppliers_synced": suppliers, "customers_synced": customers,
-                "branches_synced": branches, **stats}
+                "branches_synced": branches, "accounts_synced": accounts, **stats}
     finally:
         await client.close()

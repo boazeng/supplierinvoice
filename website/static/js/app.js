@@ -219,6 +219,10 @@ const app = {
         const custTax = d.customer?.tax_id_type || 'ח.פ/ע.מ';
 
         const ef = (path, val) => `<input class="edit-field" data-path="${path}" value="${(val || '').replace(/"/g, '&quot;')}" />`;
+        const efAc = (path, val, endpoint) => {
+            const v = (val || '').replace(/"/g, '&quot;');
+            return `<span class="ac-field"><input class="edit-field ac-input" data-path="${path}" data-ep="${endpoint}" value="${v}" autocomplete="off" spellcheck="false" /><ul class="ac-dd"></ul></span>`;
+        };
 
         // === Validation helpers ===
         const checkIcon = (ok) => ok ? '<span class="match-ok" title="תקין">✓</span>' : '<span class="match-fail" title="לא תואם">✗</span>';
@@ -258,7 +262,7 @@ const app = {
                 <div class="data-field" style="flex:2"><span class="label">כתובת</span>${ef('supplier.address', d.supplier?.address)}</div>
             </div>
             <div class="data-row">
-                <div class="data-field" style="flex:1"><span class="label">חשבון הוצאות</span>${ef('expense_account', d.expense_account)}</div>
+                <div class="data-field" style="flex:1"><span class="label">חשבון הוצאות</span>${efAc('expense_account', d.expense_account, '/api/db/accounts/search')}</div>
                 <div class="data-field" style="flex:2"></div>
             </div>
 
@@ -269,7 +273,7 @@ const app = {
             </div>
             <div class="data-row">
                 <div class="data-field"><span class="label">פריורטי</span>${ef('customer.priority_customer_code', d.customer?.priority_customer_code)}</div>
-                <div class="data-field"><span class="label">סניף</span>${ef('customer.branch', d.customer?.branch)}</div>
+                <div class="data-field"><span class="label">סניף</span>${efAc('customer.branch', d.customer?.branch, '/api/db/branches/search')}</div>
                 <div class="data-field" style="flex:2"><span class="label">כתובת</span>${ef('customer.address', d.customer?.address)}</div>
             </div>
         `;
@@ -326,6 +330,9 @@ const app = {
         dataDiv.querySelectorAll('.edit-field').forEach(input => {
             input.addEventListener('change', () => this.saveFieldEdit(input));
         });
+
+        // אתחול שדות autocomplete
+        this._setupAcFields(dataDiv);
 
         // הסתרת הזהרות
         document.getElementById('validation-warnings').style.display = 'none';
@@ -1045,6 +1052,53 @@ const app = {
             btn.disabled = false;
             btn.textContent = '🔄 סנכרן פריורטי';
         }
+    },
+
+    // === Autocomplete ===
+    _setupAcFields(container) {
+        container.querySelectorAll('.ac-input').forEach(input => {
+            const dd = input.nextElementSibling;
+            let timer = null;
+
+            const search = async (q) => {
+                if (!q.trim()) { dd.style.display = 'none'; return; }
+                try {
+                    const res = await fetch(`${input.dataset.ep}?q=${encodeURIComponent(q)}`);
+                    const data = await res.json();
+                    const items = data.results || [];
+                    if (!items.length) { dd.style.display = 'none'; return; }
+                    dd.innerHTML = items.map(item => {
+                        const code = item.account_code || item.branch_code || '';
+                        const name = item.account_name || item.name || '';
+                        const display = name ? `${code} — ${name}` : code;
+                        return `<li data-val="${code.replace(/"/g, '&quot;')}">${display}</li>`;
+                    }).join('');
+                    dd.style.display = 'block';
+                } catch { dd.style.display = 'none'; }
+            };
+
+            input.addEventListener('input', () => {
+                clearTimeout(timer);
+                timer = setTimeout(() => search(input.value), 250);
+            });
+
+            input.addEventListener('focus', () => {
+                if (input.value.trim()) search(input.value);
+            });
+
+            input.addEventListener('blur', () => {
+                setTimeout(() => { dd.style.display = 'none'; }, 200);
+            });
+
+            dd.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const li = e.target.closest('li');
+                if (!li) return;
+                input.value = li.dataset.val;
+                dd.style.display = 'none';
+                this.saveFieldEdit(input);
+            });
+        });
     },
 
     // === Toast Notifications ===

@@ -602,6 +602,47 @@ body {
     background: var(--bg-secondary);
 }
 
+/* === Autocomplete field === */
+.ac-field {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+}
+.ac-field .edit-field {
+    width: 100%;
+}
+.ac-dd {
+    display: none;
+    position: absolute;
+    top: calc(100% + 2px);
+    right: 0;
+    left: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 16px rgba(28,27,25,0.12);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 500;
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+}
+.ac-dd li {
+    padding: 7px 12px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    direction: rtl;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ac-dd li:hover, .ac-dd li.ac-selected {
+    background: var(--bg-hover);
+}
+
 .edit-line {
     width: 100%;
     box-sizing: border-box;

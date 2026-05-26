@@ -82,6 +82,17 @@ def init_db() -> None:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # טבלת חשבונות מפריורטי (מסונכרנת)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_code TEXT NOT NULL UNIQUE,
+            account_name TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_code ON accounts(account_code)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_name ON accounts(account_name)")
     conn.commit()
     conn.close()
     logger.info("בסיס הנתונים אותחל: %s", DB_PATH)
@@ -320,6 +331,47 @@ def set_supplier_expense_account(supplier_priority_code: str, expense_account: s
     """, (supplier_priority_code, expense_account))
     conn.commit()
     conn.close()
+
+
+# --- חשבונות GL (מסונכרנים מפריורטי) ---
+
+def search_accounts(q: str, limit: int = 15) -> list[dict]:
+    """חיפוש חשבון לפי קוד או שם."""
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT account_code, account_name FROM accounts
+           WHERE account_code LIKE ? OR account_name LIKE ?
+           ORDER BY account_code LIMIT ?""",
+        (f"{q}%", f"%{q}%", limit),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_accounts_count() -> int:
+    """מספר חשבונות בטבלה."""
+    conn = get_connection()
+    count = conn.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
+    conn.close()
+    return count
+
+
+def bulk_upsert_accounts(records: list[dict]) -> int:
+    """עדכון מרובה של חשבונות."""
+    conn = get_connection()
+    count = 0
+    for rec in records:
+        conn.execute("""
+            INSERT INTO accounts (account_code, account_name, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(account_code) DO UPDATE SET
+                account_name = excluded.account_name,
+                updated_at = CURRENT_TIMESTAMP
+        """, (rec["account_code"], rec["account_name"]))
+        count += 1
+    conn.commit()
+    conn.close()
+    return count
 
 
 # --- סטטוס סנכרון ---

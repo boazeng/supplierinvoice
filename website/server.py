@@ -603,6 +603,22 @@ async def db_stats():
     return companies_db.get_stats()
 
 
+@app.get("/api/db/accounts/search")
+async def search_accounts_api(q: str = Query(..., min_length=1)):
+    """חיפוש חשבון GL לפי קוד או שם."""
+    return {"results": companies_db.search_accounts(q.strip())}
+
+
+@app.get("/api/db/branches/search")
+async def search_branches_api(q: str = Query(..., min_length=1)):
+    """חיפוש סניף לפי שם או ח.פ/ע.מ."""
+    q = q.strip()
+    if q.replace("-", "").replace(" ", "").isdigit():
+        branch = companies_db.find_branch_by_tax_id(q)
+        return {"results": [branch] if branch else []}
+    return {"results": companies_db.find_branch_by_name(q)}
+
+
 @app.get("/api/db/search")
 async def search_companies(
     q: str = Query(..., min_length=1),
