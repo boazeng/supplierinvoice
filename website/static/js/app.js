@@ -133,8 +133,8 @@ const app = {
             const d = inv.extracted_data;
             const supplierName = d?.supplier?.name || 'טרם נותח';
             const invoiceNum = d?.invoice_number || '—';
-            const beforeVat = d?.total_before_vat ?? d?.total_amount ?? null;
-            const afterVat = d?.total_with_vat ?? d?.total_amount ?? null;
+            const beforeVat = d?.subtotal ?? null;
+            const afterVat = d?.total_amount ?? null;
             const date = inv.created_at
                 ? new Date(inv.created_at).toLocaleDateString('he-IL')
                 : '';
