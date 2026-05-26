@@ -1,0 +1,32 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# manuver: רק פריסה אחת בכל פעם
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 54.171.151.189
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/ec2-user/supplierinvoice
+            git fetch origin main
+            git reset --hard origin/main
+            ./venv/bin/pip install --quiet -r requirements.txt || true
+            sudo systemctl restart supplierinvoice
+            sleep 3
+            systemctl is-active supplierinvoice
+            echo "deployed: $(git rev-parse --short HEAD)"
