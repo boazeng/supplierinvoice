@@ -3,6 +3,7 @@
 משתמש בספריות התקן imaplib + email בלבד (ללא תלויות חיצוניות).
 מוגדר דרך INVOICE_INBOX_* ב-env (תיבה ייעודית לחשבוניות בלבד).
 """
+import base64
 import email
 import imaplib
 import logging
@@ -18,6 +19,35 @@ from config.settings import (
 logger = logging.getLogger("כלים.מייל")
 
 _ALLOWED_EXT = (".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".webp", ".gif")
+
+# שם התווית ב-Gmail שאליה מועברות הודעות שעובדו (התווית קיימת בתיבה)
+_MOVED_LABEL = "הועבר"
+
+
+def _mutf7_encode(s: str) -> str:
+    """קידוד למחרוזת IMAP modified UTF-7 (RFC 3501) — נדרש לתוויות בעברית."""
+    out, buf = [], []
+
+    def flush():
+        if buf:
+            b64 = base64.b64encode("".join(buf).encode("utf-16-be")).rstrip(b"=")
+            out.append("&" + b64.decode("ascii").replace("/", ",") + "-")
+            buf.clear()
+
+    for ch in s:
+        if ch == "&":
+            flush()
+            out.append("&-")
+        elif 0x20 <= ord(ch) <= 0x7E:
+            flush()
+            out.append(ch)
+        else:
+            buf.append(ch)
+    flush()
+    return "".join(out)
+
+
+_MOVED_LABEL_IMAP = _mutf7_encode(_MOVED_LABEL)
 
 
 def inbox_configured() -> bool:
@@ -66,6 +96,7 @@ def fetch_invoice_attachments() -> list[dict]:
             msg = email.message_from_bytes(msg_data[0][1])
             sender = _decode_header(msg.get("From", ""))
 
+            msg_attachments: list[dict] = []
             for part in msg.walk():
                 if part.get_content_disposition() != "attachment":
                     continue
@@ -77,9 +108,19 @@ def fetch_invoice_attachments() -> list[dict]:
                     continue
                 payload = part.get_payload(decode=True)
                 if payload:
-                    attachments.append(
+                    msg_attachments.append(
                         {"filename": filename, "content": payload, "from": sender}
                     )
+
+            attachments.extend(msg_attachments)
+
+            # הודעה שנקלטה — מתייגים "הועבר" ומסירים מ-INBOX (ארכוב)
+            if msg_attachments:
+                try:
+                    conn.store(msg_id, "+X-GM-LABELS", f'("{_MOVED_LABEL_IMAP}")')
+                    conn.store(msg_id, "-X-GM-LABELS", "(\\Inbox)")
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("תיוג/ארכוב נכשל להודעה %s: %s", msg_id, exc)
 
         logger.info("חולצו %d קבצים מצורפים מ-%d הודעות",
                     len(attachments), len(msg_ids))

@@ -74,12 +74,35 @@ const app = {
     // === טעינת רשימה ===
     async loadInvoices() {
         try {
-            const url = this.currentFilter
-                ? `/api/invoices?status=${this.currentFilter}`
-                : '/api/invoices';
-            const res = await fetch(url);
+            // טוענים את הכל פעם אחת — סופרים לפי סטטוס ומסננים בצד-לקוח
+            const res = await fetch('/api/invoices');
             const data = await res.json();
-            this.renderInvoiceList(data.invoices || []);
+            const all = data.invoices || [];
+
+            // עדכון המספר בכל לשונית
+            const counts = {};
+            for (const inv of all) counts[inv.status] = (counts[inv.status] || 0) + 1;
+            const tabLabels = {
+                '': 'הכל',
+                pending_approval: 'מייל לאישור',
+                pending_extraction: 'פענוח',
+                pending_submission: 'קליטה',
+                pending_filing: 'תיוק',
+                on_hold: 'המתנה',
+                cancelled: 'בוטל',
+            };
+            for (const [status, label] of Object.entries(tabLabels)) {
+                const tab = document.querySelector(`.tab[data-status="${status}"]`);
+                if (!tab) continue;
+                const n = status === '' ? all.length : (counts[status] || 0);
+                tab.textContent = `${label} (${n})`;
+            }
+
+            // הצגה — לפי הסינון הנוכחי
+            const filtered = this.currentFilter
+                ? all.filter(inv => inv.status === this.currentFilter)
+                : all;
+            this.renderInvoiceList(filtered);
         } catch (err) {
             // שגיאה שקטה — ננסה שוב ב-polling הבא
         }
