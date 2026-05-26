@@ -348,6 +348,17 @@ def search_accounts(q: str, limit: int = 15) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_all_accounts(limit: int = 200) -> list[dict]:
+    """מחזיר את כל החשבונות (עד limit)."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT account_code, account_name FROM accounts ORDER BY account_code LIMIT ?",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def get_accounts_count() -> int:
     """מספר חשבונות בטבלה."""
     conn = get_connection()

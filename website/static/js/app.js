@@ -1083,7 +1083,7 @@ const app = {
             });
 
             input.addEventListener('focus', () => {
-                if (input.value.trim()) search(input.value);
+                search(input.value);
             });
 
             input.addEventListener('blur', () => {
