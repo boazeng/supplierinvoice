@@ -841,10 +841,14 @@ const app = {
                 body: JSON.stringify({ notes }),
             });
             const data = await res.json();
-            if (res.ok && data.status === 'submitted') {
+            if (!res.ok) {
+                this.showToast(data.detail || data.message || 'שגיאה באישור', 'error');
+                return;
+            }
+            if (data.status === 'pending_filing') {
                 this.showToast('החשבונית נקלטה בפריורטי בהצלחה!', 'success');
             } else {
-                this.showToast(data.message || 'שגיאה באישור', 'error');
+                this.showToast(data.message || 'שגיאה בקליטה בפריורטי', 'error');
             }
             this.closeModal();
             this.loadInvoices();
