@@ -171,20 +171,20 @@ async def upload_invoice(file: UploadFile = File(...)):
 
     logger.info("קובץ הועלה: %s → %s", file.filename, save_path)
 
-    # יצירת רשומת חשבונית
+    # יצירת רשומת חשבונית — העלאה ידנית גם ממתינה לאישור (מקור = upload)
     invoice = Invoice(
         id=file_id,
         source=InvoiceSource.UPLOAD,
         file_path=str(save_path),
         file_type="pdf" if ext == ".pdf" else "image",
+        status=InvoiceStatus.PENDING_APPROVAL,
     )
     store.save(invoice)
 
-    # העלאה ידנית נכנסת ל"ממתין לפענוח" — המשתמש לוחץ "פענח" כשמוכן
     return {
         "id": invoice.id,
         "status": invoice.status.value,
-        "message": "החשבונית הועלתה — ממתינה לפענוח",
+        "message": "החשבונית הועלתה — ממתינה לאישור",
     }
 
 

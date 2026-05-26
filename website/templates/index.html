@@ -58,13 +58,14 @@
 
         <!-- Status Filter Tabs -->
         <section class="filter-tabs">
-            <button class="tab active" data-status="" onclick="app.filterByStatus(this, '')">הכל</button>
-            <button class="tab" data-status="pending_approval" onclick="app.filterByStatus(this, 'pending_approval')">מייל לאישור</button>
-            <button class="tab" data-status="pending_extraction" onclick="app.filterByStatus(this, 'pending_extraction')">פענוח</button>
-            <button class="tab" data-status="pending_submission" onclick="app.filterByStatus(this, 'pending_submission')">קליטה</button>
-            <button class="tab" data-status="pending_filing" onclick="app.filterByStatus(this, 'pending_filing')">תיוק</button>
-            <button class="tab" data-status="on_hold" onclick="app.filterByStatus(this, 'on_hold')">המתנה</button>
-            <button class="tab" data-status="cancelled" onclick="app.filterByStatus(this, 'cancelled')">בוטל</button>
+            <button class="tab active" data-status="" data-label="הכל" onclick="app.filterByStatus(this, '', '')">הכל</button>
+            <button class="tab" data-status="pending_approval" data-source="upload" data-label="לאישור" onclick="app.filterByStatus(this, 'pending_approval', 'upload')">לאישור</button>
+            <button class="tab" data-status="pending_approval" data-source="email" data-label="מייל לאישור" onclick="app.filterByStatus(this, 'pending_approval', 'email')">מייל לאישור</button>
+            <button class="tab" data-status="pending_extraction" data-label="פענוח" onclick="app.filterByStatus(this, 'pending_extraction', '')">פענוח</button>
+            <button class="tab" data-status="pending_submission" data-label="קליטה" onclick="app.filterByStatus(this, 'pending_submission', '')">קליטה</button>
+            <button class="tab" data-status="pending_filing" data-label="תיוק" onclick="app.filterByStatus(this, 'pending_filing', '')">תיוק</button>
+            <button class="tab" data-status="on_hold" data-label="המתנה" onclick="app.filterByStatus(this, 'on_hold', '')">המתנה</button>
+            <button class="tab" data-status="cancelled" data-label="בוטל" onclick="app.filterByStatus(this, 'cancelled', '')">בוטל</button>
         </section>
 
         <!-- Invoice Table -->
@@ -189,7 +190,7 @@
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/js/app.js?v=tx10"></script>
+    <script src="/static/js/app.js?v=tx11"></script>
     <script src="/static/js/tact-header.js"></script>
 </body>
 </html>

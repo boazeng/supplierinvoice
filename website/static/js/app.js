@@ -2,7 +2,7 @@
  * SupplierInvoice — לוגיקת ממשק: upload, polling, approve
  */
 const app = {
-    currentFilter: '',
+    currentFilter: { status: '', source: '' },
     currentInvoice: null,
     pollingInterval: null,
     isFullscreen: false,
@@ -74,34 +74,28 @@ const app = {
     // === טעינת רשימה ===
     async loadInvoices() {
         try {
-            // טוענים את הכל פעם אחת — סופרים לפי סטטוס ומסננים בצד-לקוח
+            // טוענים את הכל פעם אחת — סופרים לפי לשונית ומסננים בצד-לקוח
             const res = await fetch('/api/invoices');
             const data = await res.json();
             const all = data.invoices || [];
 
-            // עדכון המספר בכל לשונית
-            const counts = {};
-            for (const inv of all) counts[inv.status] = (counts[inv.status] || 0) + 1;
-            const tabLabels = {
-                '': 'הכל',
-                pending_approval: 'מייל לאישור',
-                pending_extraction: 'פענוח',
-                pending_submission: 'קליטה',
-                pending_filing: 'תיוק',
-                on_hold: 'המתנה',
-                cancelled: 'בוטל',
-            };
-            for (const [status, label] of Object.entries(tabLabels)) {
-                const tab = document.querySelector(`.tab[data-status="${status}"]`);
-                if (!tab) continue;
-                const n = status === '' ? all.length : (counts[status] || 0);
-                tab.textContent = `${label} (${n})`;
-            }
+            // עדכון מספר בכל לשונית — מסונן לפי data-status + data-source
+            const matches = (inv, status, source) =>
+                (!status || inv.status === status) &&
+                (!source || inv.source === source);
+
+            document.querySelectorAll('.tab').forEach(tab => {
+                const status = tab.dataset.status || '';
+                const source = tab.dataset.source || '';
+                const base = tab.dataset.label || tab.textContent.replace(/\s*\(\d+\)\s*$/, '');
+                tab.dataset.label = base;
+                const n = all.filter(inv => matches(inv, status, source)).length;
+                tab.textContent = `${base} (${n})`;
+            });
 
             // הצגה — לפי הסינון הנוכחי
-            const filtered = this.currentFilter
-                ? all.filter(inv => inv.status === this.currentFilter)
-                : all;
+            const cf = this.currentFilter || { status: '', source: '' };
+            const filtered = all.filter(inv => matches(inv, cf.status, cf.source));
             this.renderInvoiceList(filtered);
         } catch (err) {
             // שגיאה שקטה — ננסה שוב ב-polling הבא
@@ -161,10 +155,10 @@ const app = {
     },
 
     // === סינון ===
-    filterByStatus(btn, status) {
+    filterByStatus(btn, status, source) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         btn.classList.add('active');
-        this.currentFilter = status;
+        this.currentFilter = { status: status || '', source: source || '' };
         this.loadInvoices();
     },
 
