@@ -39,3 +39,8 @@ desktop.ini
 # Claude
 .claude/
 data/ledger/
+
+# Local dev stubs (לא לדפלוי)
+shared_auth.py
+server.log
+server_err.log
