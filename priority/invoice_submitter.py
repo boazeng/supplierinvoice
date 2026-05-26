@@ -39,9 +39,6 @@ def _build_priority_payload(data: InvoiceData) -> dict:
     if data.customer.branch:
         payload["BRANCHNAME"] = data.customer.branch
 
-    if data.allocation_number:
-        payload["IVMIVNUM"] = data.allocation_number
-
     return payload
 
 
