@@ -27,7 +27,8 @@ def _build_priority_payload(data: InvoiceData) -> dict:
     }
 
     payload = {
-        "IVNUM": data.invoice_number,
+        "DEBIT": "D",
+        "BOOKNUM": data.invoice_number,
         "IVDATE": data.invoice_date,
         "SUPNAME": data.supplier.priority_supplier_code,
         "PINVOICEITEMS_SUBFORM": [item],
