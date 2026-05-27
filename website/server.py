@@ -559,8 +559,7 @@ async def file_invoice_to_ledger(invoice_id: str):
     return {"ok": True, "branch": branch, "year": year}
 
 
-@app.post("/api/invoices/{invoice_id}/approve",
-          dependencies=[Depends(require_role("admin"))])
+@app.post("/api/invoices/{invoice_id}/approve")
 async def approve_invoice(invoice_id: str, body: dict = {}):
     """אישור קליטה בפריורטי."""
     invoice = store.get(invoice_id)
@@ -612,8 +611,7 @@ async def set_invoice_status(invoice_id: str, body: dict = {}):
     return {"id": invoice.id, "status": invoice.status.value}
 
 
-@app.post("/api/test/create-filing-test",
-          dependencies=[Depends(require_role("admin"))])
+@app.post("/api/test/create-filing-test")
 async def create_filing_test():
     """יוצר חשבונית בדיקה בסטטוס ממתין לתיוק — לבדיקת כפתור התיוק."""
     from agents.models import SupplierInfo, CustomerInfo, InvoiceData
@@ -643,8 +641,7 @@ async def create_filing_test():
     return {"id": test_id, "message": "חשבונית בדיקה נוצרה — פתחי אותה ובדקי את כפתור התיוק"}
 
 
-@app.delete("/api/invoices/{invoice_id}",
-            dependencies=[Depends(require_role("admin"))])
+@app.delete("/api/invoices/{invoice_id}")
 async def delete_invoice(invoice_id: str):
     """מחיקת חשבונית כולל הקובץ."""
     invoice = store.get(invoice_id)
