@@ -43,6 +43,7 @@ auth = install_auth(
     initial_users=[
         {"email": "boazen@gmail.com", "role": "admin"},
         {"email": "boen01@gmail.com", "role": "admin"},
+        {"email": "yael.israel303@gmail.com", "role": "admin"},
     ],
     public_prefixes=("/api/health", "/api/cron/"),
 )
@@ -506,7 +507,7 @@ async def update_invoice_field(invoice_id: str, body: dict = {}):
 
 
 @app.post("/api/invoices/{invoice_id}/approve",
-          dependencies=[Depends(require_role("approver"))])
+          dependencies=[Depends(require_role("admin"))])
 async def approve_invoice(invoice_id: str, body: dict = {}):
     """אישור קליטה בפריורטי."""
     invoice = store.get(invoice_id)
@@ -558,7 +559,7 @@ async def set_invoice_status(invoice_id: str, body: dict = {}):
 
 
 @app.delete("/api/invoices/{invoice_id}",
-            dependencies=[Depends(require_role("approver"))])
+            dependencies=[Depends(require_role("admin"))])
 async def delete_invoice(invoice_id: str):
     """מחיקת חשבונית כולל הקובץ."""
     invoice = store.get(invoice_id)
