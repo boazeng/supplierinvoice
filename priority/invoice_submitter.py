@@ -23,8 +23,11 @@ def _build_priority_payload(data: InvoiceData) -> dict:
         "PARTNAME": "000",
         "PDES": pdes,
         "TQUANT": 1,
-        "PRICE": data.subtotal,
+        "TPRICE": data.subtotal,
+        "DEBIT": data.total_amount,
     }
+    if data.expense_account:
+        item["ACCOUNT"] = data.expense_account
 
     payload = {
         "DEBIT": "D",
@@ -54,6 +57,9 @@ async def submit_approved_invoice(
 
     if not invoice.extracted_data.supplier.priority_supplier_code:
         raise ValueError("לא נמצא קוד ספק בפריורטי — לא ניתן לקלוט")
+
+    if not invoice.extracted_data.invoice_number:
+        raise ValueError("מספר חשבונית חסר — יש לערוך ולהזין מספר חשבונית לפני הקליטה")
 
     logger.info(
         "שולח חשבונית %s לפריורטי — ספק: %s",
