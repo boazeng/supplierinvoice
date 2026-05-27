@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 import anthropic
+import httpx
 
 from agents.models import InvoiceData, InvoiceLine, SupplierInfo, CustomerInfo
 from config.settings import ANTHROPIC_API_KEY, AI_MODEL
@@ -175,7 +176,10 @@ async def extract_invoice(file_path: str) -> InvoiceData:
 
     file_data, media_type = _read_file_as_base64(file_path)
 
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    import os
+    dev_mode = os.getenv("ENV", "production") == "development"
+    http_client = httpx.Client(verify=not dev_mode)
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, http_client=http_client)
 
     # בניית הבקשה עם תמונה
     if media_type == "application/pdf":
@@ -293,7 +297,10 @@ async def reextract_invoice(file_path: str, crop_coords: dict) -> InvoiceData:
     logger.info("פענוח חוזר מקובץ: %s עם קואורדינטות: %s", file_path, crop_coords)
 
     file_data, media_type = _read_file_as_base64(file_path)
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    import os
+    dev_mode = os.getenv("ENV", "production") == "development"
+    http_client = httpx.Client(verify=not dev_mode)
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, http_client=http_client)
 
     content_blocks = []
 

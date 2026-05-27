@@ -69,9 +69,13 @@ async def submit_approved_invoice(
         invoice.error_message = ""
         logger.info("חשבונית נקלטה בפריורטי בהצלחה — IVNUM: %s", invoice.priority_invoice_id)
     except Exception as e:
+        import httpx as _httpx
+        detail = str(e)
+        if isinstance(e, _httpx.HTTPStatusError):
+            detail = e.response.text
         invoice.status = InvoiceStatus.PENDING_SUBMISSION
-        invoice.error_message = f"שגיאה בקליטה בפריורטי: {e}"
-        logger.error("שגיאה בקליטה: %s", e)
+        invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
+        logger.error("שגיאה בקליטה: %s", detail)
 
     invoice.updated_at = datetime.now().isoformat()
     store.save(invoice)
