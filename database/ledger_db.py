@@ -57,7 +57,12 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_ledger_docs_book
             ON ledger_documents(book_id, document_date);
     """)
-    conn.commit()
+    # מיגרציה — עמודת invoice_id (מקשרת חזרה לחשבונית המקורית)
+    try:
+        conn.execute("ALTER TABLE ledger_documents ADD COLUMN invoice_id TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        pass  # עמודה כבר קיימת
     conn.close()
 
 
@@ -74,6 +79,20 @@ def create_company(name: str, tax_id: str = "") -> int:
     conn = _conn()
     cur = conn.execute("INSERT INTO ledger_companies (name, tax_id) VALUES (?, ?)",
                        (name.strip(), tax_id.strip()))
+    conn.commit()
+    cid = cur.lastrowid
+    conn.close()
+    return cid
+
+
+def find_or_create_company(name: str) -> int:
+    """מחזיר id של חברה לפי שם — יוצר אם לא קיימת."""
+    conn = _conn()
+    row = conn.execute("SELECT id FROM ledger_companies WHERE name = ?", (name.strip(),)).fetchone()
+    if row:
+        conn.close()
+        return row["id"]
+    cur = conn.execute("INSERT INTO ledger_companies (name) VALUES (?)", (name.strip(),))
     conn.commit()
     cid = cur.lastrowid
     conn.close()
@@ -101,6 +120,24 @@ def list_books(company_id: int) -> list[dict]:
 
 def create_book(company_id: int, year: int) -> int:
     conn = _conn()
+    cur = conn.execute("INSERT INTO ledger_books (company_id, year) VALUES (?, ?)",
+                       (company_id, year))
+    conn.commit()
+    bid = cur.lastrowid
+    conn.close()
+    return bid
+
+
+def find_or_create_book(company_id: int, year: int) -> int:
+    """מחזיר id של ספר לפי חברה+שנה — יוצר אם לא קיים."""
+    conn = _conn()
+    row = conn.execute(
+        "SELECT id FROM ledger_books WHERE company_id = ? AND year = ?",
+        (company_id, year),
+    ).fetchone()
+    if row:
+        conn.close()
+        return row["id"]
     cur = conn.execute("INSERT INTO ledger_books (company_id, year) VALUES (?, ?)",
                        (company_id, year))
     conn.commit()
@@ -155,18 +192,29 @@ def delete_divider(divider_id: int) -> None:
 
 # ===================== מסמכים =====================
 
+def get_document_by_invoice_id(invoice_id: str) -> Optional[dict]:
+    """מחזיר מסמך לדג'ר לפי invoice_id."""
+    conn = _conn()
+    row = conn.execute(
+        "SELECT * FROM ledger_documents WHERE invoice_id = ?", (invoice_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 def create_document(book_id: int, file_path: str, original_filename: str,
                     file_type: str, document_date: Optional[str], scan_date: str,
                     date_source: str, title: str = "",
-                    divider_id: Optional[int] = None) -> int:
+                    divider_id: Optional[int] = None,
+                    invoice_id: str = "") -> int:
     conn = _conn()
     cur = conn.execute("""
         INSERT INTO ledger_documents
             (book_id, divider_id, title, file_path, original_filename, file_type,
-             document_date, scan_date, date_source)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             document_date, scan_date, date_source, invoice_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (book_id, divider_id, title, file_path, original_filename, file_type,
-          document_date, scan_date, date_source))
+          document_date, scan_date, date_source, invoice_id))
     conn.commit()
     doc_id = cur.lastrowid
     conn.close()

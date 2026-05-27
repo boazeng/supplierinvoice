@@ -24,6 +24,7 @@ from priority.sync_agent import sync_from_priority, get_sync_status
 from tools.invoice_store import InvoiceStore
 from config.settings import INVOICES_DIR, BASE_DIR
 from database import db as companies_db
+from database import ledger_db
 from database.sync import sync_all as sync_companies_from_priority
 
 logger = logging.getLogger("אתר.שרת")
@@ -504,6 +505,56 @@ async def update_invoice_field(invoice_id: str, body: dict = {}):
         return {"ok": True, "path": path, "value": value}
     else:
         raise HTTPException(status_code=400, detail=f"שדה לא קיים: {field}")
+
+
+@app.post("/api/invoices/{invoice_id}/file-to-ledger")
+async def file_invoice_to_ledger(invoice_id: str):
+    """תיוק חשבונית בספרי הנהלת חשבונות — לפי סניף + שנת חשבונית."""
+    import re
+    from datetime import date as date_cls
+    invoice = store.get(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+    if invoice.status != InvoiceStatus.PENDING_FILING:
+        raise HTTPException(status_code=400, detail="ניתן לתייק רק חשבוניות בסטטוס 'ממתין לתיוק'")
+
+    d = invoice.extracted_data
+    branch = (d.customer.branch if d else "") or "כללי"
+    supplier_name = re.sub(r'[\\/:*?"<>|]', '_', (d.supplier.name if d else "") or "ספק")
+    invoice_num = re.sub(r'[\\/:*?"<>|]', '_', (d.invoice_number if d else "") or invoice_id[:8])
+    invoice_date = (d.invoice_date if d else "") or date_cls.today().isoformat()
+    try:
+        year = int(invoice_date[:4])
+    except (ValueError, TypeError):
+        year = date_cls.today().year
+
+    company_id = ledger_db.find_or_create_company(branch)
+    book_id = ledger_db.find_or_create_book(company_id, year)
+
+    ext = Path(invoice.file_path).suffix.lower()
+    filename = f"{supplier_name}_{invoice_num}{ext}"
+    book_dir = DATA_DIR / "ledger" / str(book_id)
+    book_dir.mkdir(parents=True, exist_ok=True)
+    dest = book_dir / filename
+    shutil.copy2(invoice.file_path, dest)
+
+    ledger_db.create_document(
+        book_id=book_id,
+        file_path=str(dest),
+        original_filename=filename,
+        file_type=ext.lstrip("."),
+        document_date=invoice_date,
+        scan_date=date_cls.today().isoformat(),
+        date_source="document",
+        title=f"{supplier_name} {invoice_num}",
+        invoice_id=invoice_id,
+    )
+
+    invoice.status = InvoiceStatus.FILED
+    invoice.updated_at = datetime.now().isoformat()
+    store.save(invoice)
+    logger.info("חשבונית %s תויקה בספרי הנהלת חשבונות — %s/%d", invoice_id, branch, year)
+    return {"ok": True, "branch": branch, "year": year}
 
 
 @app.post("/api/invoices/{invoice_id}/approve",

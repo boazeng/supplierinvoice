@@ -185,4 +185,27 @@ def register_ledger_routes(app, templates_dir: Path) -> None:
             logger.warning("מחיקת קובץ נכשלה: %s", exc)
         return {"ok": True}
 
+    @app.post("/api/ledger/documents/{doc_id}/restore-invoice")
+    async def restore_invoice_from_ledger(doc_id: int):
+        """החזרת חשבונית מתויקת לרשימת חשבוניות ספק."""
+        from agents.models import InvoiceStatus
+        from datetime import datetime
+        doc = ledger_db.get_document(doc_id)
+        if not doc:
+            raise HTTPException(404, "מסמך לא נמצא")
+        invoice_id = doc.get("invoice_id", "")
+        if not invoice_id:
+            raise HTTPException(400, "מסמך זה לא קשור לחשבונית")
+
+        from website.server import store as invoice_store
+        invoice = invoice_store.get(invoice_id)
+        if not invoice:
+            raise HTTPException(404, "החשבונית המקורית לא נמצאה")
+
+        invoice.status = InvoiceStatus.PENDING_FILING
+        invoice.updated_at = datetime.now().isoformat()
+        invoice_store.save(invoice)
+        logger.info("חשבונית %s הוחזרה לרשימה מספרי הנהלת חשבונות", invoice_id)
+        return {"ok": True, "invoice_id": invoice_id}
+
     logger.info("נתיבי ספרי הנהלת חשבונות נרשמו")

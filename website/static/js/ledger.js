@@ -158,6 +158,7 @@ const L = {
                 <span class="actions">
                     <button class="btn-light btn-sm" onclick="window.open('/api/ledger/documents/${d.id}/file')">צפה</button>
                     <button class="btn-light btn-sm" onclick="L.editDoc(${d.id})">ערוך</button>
+                    ${d.invoice_id ? `<button class="btn-light btn-sm" style="color:#2563eb" onclick="L.restoreInvoice(${d.id})">החזר לרשימה</button>` : ''}
                 </span></div>`;
         }
         html += '</div>';
@@ -217,6 +218,17 @@ const L = {
             toast('נשמר');
             L.book = await api(`/api/ledger/books/${L.bookId}`);
             el('cat-list').innerHTML = L.book.categories.map(c => `<option value="${esc(c)}">`).join('');
+            await L.loadDocuments();
+        } catch (e) { toast(e.message); }
+    },
+
+    async restoreInvoice(docId) {
+        if (!confirm('להחזיר חשבונית זו לרשימת חשבוניות ספק?')) return;
+        try {
+            const res = await fetch(`/api/ledger/documents/${docId}/restore-invoice`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) { toast(data.detail || 'שגיאה'); return; }
+            toast('החשבונית הוחזרה לרשימה');
             await L.loadDocuments();
         } catch (e) { toast(e.message); }
     },

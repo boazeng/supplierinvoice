@@ -104,6 +104,8 @@
                                     onclick="app.extractInvoice()">פענח</button>
 <button id="btn-submit" class="btn btn-success btn-sm" style="display:none"
                                     onclick="app.approveInvoice()">אשר וקלוט בפריורטי</button>
+                            <button id="btn-file" class="btn btn-success btn-sm" style="display:none"
+                                    onclick="app.fileToLedger()">תייק בספרי הנהלת חשבונות</button>
                             <button id="btn-restore" class="btn btn-primary btn-sm" style="display:none"
                                     onclick="app.changeStatus('pending_approval','הוחזר לאישור')">החזר לאישור</button>
                             <button id="btn-hold" class="btn btn-sm" style="display:none;background:var(--text-muted);color:#fff"
@@ -190,7 +192,7 @@
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/js/app.js?v=tx12"></script>
+    <script src="/static/js/app.js?v=tx13"></script>
     <script src="/static/js/tact-header.js"></script>
 </body>
 </html>

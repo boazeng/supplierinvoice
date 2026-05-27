@@ -370,6 +370,7 @@ const app = {
         showBtn('btn-approve-intake', s === 'pending_approval');
         showBtn('btn-extract', s === 'pending_extraction');
         showBtn('btn-submit', s === 'pending_submission');
+        showBtn('btn-file', s === 'pending_filing');
         showBtn('btn-restore', s === 'on_hold' || s === 'cancelled');
         showBtn('btn-hold', s !== 'on_hold' && s !== 'cancelled');
         showBtn('btn-cancel', s !== 'cancelled');
@@ -847,6 +848,25 @@ const app = {
     },
 
     // === אישור / דחייה ===
+    async fileToLedger() {
+        if (!this.currentInvoice) return;
+        try {
+            const res = await fetch(`/api/invoices/${this.currentInvoice.id}/file-to-ledger`, {
+                method: 'POST',
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                this.showToast(data.detail || 'שגיאה בתיוק', 'error');
+                return;
+            }
+            this.showToast(`תויק בספרי הנהלת חשבונות — ${data.branch} / ${data.year}`, 'success');
+            this.closeModal();
+            this.loadInvoices();
+        } catch (err) {
+            this.showToast('שגיאת תקשורת', 'error');
+        }
+    },
+
     async approveInvoice() {
         if (!this.currentInvoice) return;
         const notes = document.getElementById('user-notes').value;
