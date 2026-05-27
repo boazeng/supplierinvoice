@@ -180,6 +180,26 @@ def create_divider(book_id: int, name: str) -> int:
     return did
 
 
+def find_or_create_divider(book_id: int, name: str) -> int:
+    """מחזיר id של חוצץ (ספק) בספר — יוצר אם לא קיים."""
+    conn = _conn()
+    row = conn.execute(
+        "SELECT id FROM ledger_dividers WHERE book_id = ? AND name = ?",
+        (book_id, name.strip()),
+    ).fetchone()
+    if row:
+        conn.close()
+        return row["id"]
+    cur = conn.execute(
+        "INSERT INTO ledger_dividers (book_id, name) VALUES (?, ?)",
+        (book_id, name.strip()),
+    )
+    conn.commit()
+    did = cur.lastrowid
+    conn.close()
+    return did
+
+
 def delete_divider(divider_id: int) -> None:
     conn = _conn()
     # מסמכים שהיו בחוצץ — מתנתקים ממנו (לא נמחקים)

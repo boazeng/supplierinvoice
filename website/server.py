@@ -530,12 +530,13 @@ async def file_invoice_to_ledger(invoice_id: str):
 
     company_id = ledger_db.find_or_create_company(branch)
     book_id = ledger_db.find_or_create_book(company_id, year)
+    divider_id = ledger_db.find_or_create_divider(book_id, supplier_name)
 
     ext = Path(invoice.file_path).suffix.lower()
     filename = f"{supplier_name}_{invoice_num}{ext}"
-    book_dir = DATA_DIR / "ledger" / str(book_id)
-    book_dir.mkdir(parents=True, exist_ok=True)
-    dest = book_dir / filename
+    supplier_dir = DATA_DIR / "ledger" / str(book_id) / supplier_name
+    supplier_dir.mkdir(parents=True, exist_ok=True)
+    dest = supplier_dir / filename
     shutil.copy2(invoice.file_path, dest)
 
     ledger_db.create_document(
@@ -547,6 +548,7 @@ async def file_invoice_to_ledger(invoice_id: str):
         scan_date=date_cls.today().isoformat(),
         date_source="document",
         title=f"{supplier_name} {invoice_num}",
+        divider_id=divider_id,
         invoice_id=invoice_id,
     )
 
