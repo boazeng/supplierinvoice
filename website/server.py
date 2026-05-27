@@ -588,6 +588,7 @@ async def approve_invoice(invoice_id: str, body: dict = {}):
 _MANUAL_STATUS = {
     "pending_approval": InvoiceStatus.PENDING_APPROVAL,      # החזרה לאישור (מהמתנה/בוטל)
     "pending_extraction": InvoiceStatus.PENDING_EXTRACTION,  # אישור לפענוח
+    "pending_filing": InvoiceStatus.PENDING_FILING,          # העברה ידנית לממתין לתיוק
     "on_hold": InvoiceStatus.ON_HOLD,                        # העברה להמתנה
     "cancelled": InvoiceStatus.CANCELLED,                    # ביטול
 }
@@ -609,6 +610,37 @@ async def set_invoice_status(invoice_id: str, body: dict = {}):
     store.save(invoice)
     logger.info("סטטוס חשבונית %s שונה ידנית ל-%s", invoice_id, target)
     return {"id": invoice.id, "status": invoice.status.value}
+
+
+@app.post("/api/test/create-filing-test",
+          dependencies=[Depends(require_role("admin"))])
+async def create_filing_test():
+    """יוצר חשבונית בדיקה בסטטוס ממתין לתיוק — לבדיקת כפתור התיוק."""
+    from agents.models import SupplierInfo, CustomerInfo, InvoiceData
+    import shutil as _shutil
+    test_id = str(uuid.uuid4())
+    # קובץ ריק לבדיקה
+    test_path = INVOICES_DIR / f"{test_id}.pdf"
+    # מחפש קובץ PDF קיים כלשהו להעתקה, אחרת יוצר ריק
+    existing = list(INVOICES_DIR.glob("*.pdf"))
+    if existing:
+        _shutil.copy2(existing[0], test_path)
+    else:
+        test_path.write_bytes(b"%PDF-1.4 test")
+
+    supplier = SupplierInfo(name="ספק בדיקה", tax_id="123456789",
+                            priority_supplier_code="TEST001", priority_match_found=True)
+    customer = CustomerInfo(name="החברה שלנו", branch="סניף מרכז")
+    data = InvoiceData(invoice_number="INV-TEST-001", invoice_date="2026-01-15",
+                       supplier=supplier, customer=customer,
+                       subtotal=1000.0, vat_amount=170.0, total_amount=1170.0)
+    invoice = Invoice(id=test_id, source=InvoiceSource.UPLOAD,
+                      file_path=str(test_path), file_type="pdf",
+                      status=InvoiceStatus.PENDING_FILING,
+                      extracted_data=data, extraction_ok=True,
+                      priority_invoice_id="TEST-PRIORITY-001")
+    store.save(invoice)
+    return {"id": test_id, "message": "חשבונית בדיקה נוצרה — פתחי אותה ובדקי את כפתור התיוק"}
 
 
 @app.delete("/api/invoices/{invoice_id}",

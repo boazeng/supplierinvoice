@@ -958,6 +958,16 @@ const app = {
     },
 
     // משיכה ידנית של חשבוניות מתיבת המייל הייעודית
+    async createFilingTest() {
+        try {
+            const res = await fetch('/api/test/create-filing-test', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) { this.showToast(data.detail || 'שגיאה', 'error'); return; }
+            this.showToast(data.message, 'success');
+            this.loadInvoices();
+        } catch (err) { this.showToast('שגיאת תקשורת', 'error'); }
+    },
+
     async fetchEmail() {
         const btn = document.getElementById('btn-fetch-email');
         const orig = btn.textContent;
