@@ -23,17 +23,14 @@ def _build_priority_payload(data: InvoiceData) -> dict:
         "PARTNAME": "000",
         "PDES": pdes,
         "TQUANT": 1,
-        "TPRICE": data.subtotal,
-        "DEBIT": data.total_amount,
+        "PRICE": data.subtotal,
     }
-    if data.expense_account:
-        item["ACCOUNT"] = data.expense_account
 
     payload = {
         "IVNUM": data.invoice_number,
         "IVDATE": data.invoice_date,
         "SUPNAME": data.supplier.priority_supplier_code,
-        "PINVOICEITEMS": [item],
+        "PINVOICEITEMS_SUBFORM": [item],
     }
 
     if data.customer.branch:
