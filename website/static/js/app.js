@@ -402,7 +402,7 @@ const app = {
         if (!box) return;
 
         const d = invoice && invoice.extracted_data;
-        if (!d) { box.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem">אין נתונים מחולצים</div>'; return; }
+        if (!d) { box.innerHTML = ''; return; }
 
         const branch = ((d.customer && d.customer.branch) || '').trim();
         const sfx = branch ? '-' + branch : '';
@@ -411,44 +411,52 @@ const app = {
         const total = parseFloat(d.total_amount) || 0;
         const expenseAcc = (d.expense_account || '').trim();
         const supplierAcc = ((d.supplier && d.supplier.priority_supplier_code) || '').trim();
+        const supplierName = (d.supplier && d.supplier.name) || 'ספק';
 
-        const money = n => n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const acc = base => base ? base + sfx : '— חסר —';
-
-        // פיצול: חובה לחשבון הוצאות (לפני מע"מ) + חובה למע"מ תשומות, זכות לספק (כולל מע"מ)
-        const rows = [];
-        rows.push({ acc: acc(expenseAcc), desc: 'חשבון הוצאות', debit: subtotal, credit: 0 });
-        if (vat > 0) rows.push({ acc: acc('205-2'), desc: 'מע"מ תשומות', debit: vat, credit: 0 });
-        rows.push({ acc: acc(supplierAcc), desc: (d.supplier && d.supplier.name) || 'ספק', debit: 0, credit: total });
-
-        let warn = '';
-        if (!branch) warn = '⚠ לא זוהה סניף ללקוח — קודי החשבון חסרים את סיומת הסניף.';
-        else if (!expenseAcc) warn = '⚠ לא הוזן חשבון הוצאות.';
-        else if (!supplierAcc) warn = '⚠ הספק לא זוהה בפריורטי.';
-
-        const dr = rows.reduce((s, r) => s + r.debit, 0);
-        const cr = rows.reduce((s, r) => s + r.credit, 0);
-        const balanced = Math.abs(dr - cr) < 0.01;
+        const money = n => '₪' + n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const balanced = Math.abs((subtotal + vat) - total) < 0.01;
 
         box.innerHTML = `
-            <h4 style="margin:0 0 6px;color:var(--accent)">תנועת יומן — תצוגה מקדימה</h4>
-            <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px">
-                סוג תנועה: חשבונית ספק · סניף: ${branch || '—'}</div>
-            ${warn ? `<div style="color:var(--danger);font-size:0.82rem;margin-bottom:8px">${warn}</div>` : ''}
-            <table class="invoice-table" style="width:100%">
-                <thead><tr><th>חשבון</th><th>תיאור</th><th>חובה</th><th>זכות</th></tr></thead>
-                <tbody>
-                    ${rows.map(r => `<tr>
-                        <td>${r.acc}</td><td>${r.desc}</td>
-                        <td>${r.debit ? '₪' + money(r.debit) : ''}</td>
-                        <td>${r.credit ? '₪' + money(r.credit) : ''}</td></tr>`).join('')}
-                    <tr style="font-weight:700;border-top:2px solid var(--border)">
-                        <td colspan="2">סה"כ</td>
-                        <td>₪${money(dr)}</td><td>₪${money(cr)}</td></tr>
-                </tbody>
-            </table>
-            <div style="font-size:0.8rem;margin-top:6px;color:${balanced ? 'var(--success)' : 'var(--danger)'}">
-                ${balanced ? '✓ התנועה מאוזנת' : '⚠ התנועה אינה מאוזנת — בדוק את הסכומים'}</div>`;
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">פקודת יומן</span>
+                <span style="font-size:0.75rem;padding:2px 8px;border-radius:20px;background:${balanced ? 'var(--success)' : 'var(--danger)'};color:#fff">
+                    ${balanced ? '✓ מאוזן' : '⚠ לא מאוזן'}</span>
+            </div>
+            <div style="display:grid;gap:4px">
+                <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+                    <div style="display:flex;align-items:center;gap:6px">
+                        <span style="font-size:0.75rem;color:var(--text-secondary);white-space:nowrap">הוצאות ח׳</span>
+                        <input class="edit-field tx-acc-input" data-path="expense_account"
+                            value="${expenseAcc}" placeholder="קוד חשבון"
+                            style="width:80px;font-size:0.82rem;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg-primary);color:var(--text-primary);text-align:center">
+                        ${sfx ? `<span style="font-size:0.78rem;color:var(--text-secondary)">${sfx}</span>` : ''}
+                    </div>
+                    <span style="font-size:0.85rem;font-weight:500;color:var(--text-primary)">${money(subtotal)}</span>
+                </div>
+                ${vat > 0 ? `
+                <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+                    <div style="display:flex;align-items:center;gap:6px">
+                        <span style="font-size:0.75rem;color:var(--text-secondary)">מע"מ תשומות</span>
+                        <span style="font-size:0.82rem;color:var(--text-primary)">205-2${sfx}</span>
+                    </div>
+                    <span style="font-size:0.85rem;font-weight:500;color:var(--text-primary)">${money(vat)}</span>
+                </div>` : ''}
+                <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:5px 0">
+                    <div style="display:flex;align-items:center;gap:6px">
+                        <span style="font-size:0.75rem;color:var(--text-secondary);white-space:nowrap">ספק ז׳</span>
+                        <input class="edit-field tx-acc-input" data-path="supplier.priority_supplier_code"
+                            value="${supplierAcc}" placeholder="קוד ספק"
+                            style="width:80px;font-size:0.82rem;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg-primary);color:var(--text-primary);text-align:center">
+                        ${sfx ? `<span style="font-size:0.78rem;color:var(--text-secondary)">${sfx}</span>` : ''}
+                        <span style="font-size:0.78rem;color:var(--text-secondary)">${supplierName}</span>
+                    </div>
+                    <span style="font-size:0.85rem;font-weight:500;color:var(--text-primary)">${money(total)}</span>
+                </div>
+            </div>`;
+
+        box.querySelectorAll('.edit-field').forEach(input => {
+            input.addEventListener('change', () => this.saveFieldEdit(input));
+        });
     },
 
     toggleFullscreen(forceOn = null) {
