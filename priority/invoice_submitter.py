@@ -24,9 +24,6 @@ def _build_priority_payload(data: InvoiceData) -> dict:
         "TQUANT": 1,
         "PRICE": data.subtotal,
     }
-    if data.expense_account:
-        item["ACCOUNT"] = data.expense_account
-
     payload = {
         "DEBIT": "D",
         "BOOKNUM": data.invoice_number,
