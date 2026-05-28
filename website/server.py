@@ -46,7 +46,7 @@ auth = install_auth(
         {"email": "boen01@gmail.com", "role": "admin"},
         {"email": "yael.israel303@gmail.com", "role": "admin"},
     ],
-    public_prefixes=("/api/health", "/api/cron/"),
+    public_prefixes=("/api/health", "/api/cron/", "/api/deploy"),
 )
 
 # --- מערכת ספרי הנהלת חשבונות ---
@@ -86,6 +86,20 @@ async def favicon():
 async def admin_users_page():
     """מסך ניהול משתמשים — admin בלבד."""
     return HTMLResponse((TEMPLATES_DIR / "admin_users.html").read_text(encoding="utf-8"))
+
+
+@app.post("/api/deploy")
+async def github_deploy(request: Request):
+    """GitHub webhook — git pull + systemctl restart בכל push."""
+    import hmac, hashlib, subprocess, os
+    secret = os.getenv("DEPLOY_SECRET", "")
+    sig = request.headers.get("X-Hub-Signature-256", "")
+    body = await request.body()
+    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        raise HTTPException(status_code=403, detail="invalid signature")
+    subprocess.Popen(["bash", "-c", "sleep 1 && git -C /home/ubuntu/supplierinvoice pull && sudo systemctl restart supplierinvoice"])
+    return {"ok": True}
 
 
 @app.get("/api/health")
