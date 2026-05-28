@@ -13,7 +13,6 @@ logger = logging.getLogger("פריורטי.קליטה")
 
 def _build_priority_payload(data: InvoiceData) -> dict:
     """בונה את ה-payload לקליטה ב-PINVOICES לפי מבנה OData של Priority."""
-    # תיאור — מחרוזת שורות החשבונית, או שם הספק אם אין שורות
     if data.lines:
         pdes = "; ".join(ln.description for ln in data.lines if ln.description)[:100]
     else:
@@ -23,8 +22,7 @@ def _build_priority_payload(data: InvoiceData) -> dict:
         "PARTNAME": "000",
         "PDES": pdes,
         "TQUANT": 1,
-        "TPRICE": data.subtotal,
-        "DEBIT": data.total_amount,
+        "PRICE": data.subtotal,
     }
     if data.expense_account:
         item["ACCOUNT"] = data.expense_account
