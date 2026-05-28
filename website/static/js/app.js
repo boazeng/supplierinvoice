@@ -169,16 +169,13 @@ const app = {
             const invoice = await res.json();
             this.currentInvoice = invoice;
 
-            // איפוס פאנל "פרטי התנועה" — שלא יישאר תוכן מהחשבונית הקודמת
-            const txBox = document.getElementById('transaction-preview');
-            if (txBox) { txBox.innerHTML = ''; txBox.style.display = 'none'; }
-
             const modal = document.getElementById('invoice-modal');
             modal.style.display = 'flex';
             this.toggleFullscreen(true);
 
             // render אחרי שה-modal visible כדי שה-iframe יטען
             this.renderModal(invoice);
+            this.renderTransactionPreview(invoice);
 
             // אתחול ריבועים אחרי שהתמונה/PDF נטענת
             setTimeout(() => {
@@ -400,12 +397,12 @@ const app = {
     },
 
     // תצוגה מקדימה של תנועת היומן שתיווצר בקליטה לפריורטי
-    toggleTransactionPreview() {
+    renderTransactionPreview(invoice) {
         const box = document.getElementById('transaction-preview');
-        if (box.style.display === 'block') { box.style.display = 'none'; return; }
+        if (!box) return;
 
-        const d = this.currentInvoice && this.currentInvoice.extracted_data;
-        if (!d) { this.showToast('אין נתונים מחולצים', 'error'); return; }
+        const d = invoice && invoice.extracted_data;
+        if (!d) { box.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem">אין נתונים מחולצים</div>'; return; }
 
         const branch = ((d.customer && d.customer.branch) || '').trim();
         const sfx = branch ? '-' + branch : '';
@@ -452,7 +449,6 @@ const app = {
             </table>
             <div style="font-size:0.8rem;margin-top:6px;color:${balanced ? 'var(--success)' : 'var(--danger)'}">
                 ${balanced ? '✓ התנועה מאוזנת' : '⚠ התנועה אינה מאוזנת — בדוק את הסכומים'}</div>`;
-        box.style.display = 'block';
     },
 
     toggleFullscreen(forceOn = null) {
@@ -748,6 +744,7 @@ const app = {
                     const updatedInv = await invRes.json();
                     this.currentInvoice = updatedInv;
                     this.renderModal(updatedInv);
+                    this.renderTransactionPreview(updatedInv);
 
                     setTimeout(() => {
                         for (const t of ['supplier', 'customer', 'allocation']) {
