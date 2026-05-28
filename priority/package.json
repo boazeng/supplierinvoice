@@ -1,0 +1,10 @@
+{
+  "name": "supplierinvoice-priority-extfiles",
+  "version": "1.0.0",
+  "description": "Upload invoice files to Priority EXTFILES via Web SDK",
+  "main": "upload_extfile.js",
+  "dependencies": {
+    "priority-web-sdk": "*",
+    "dotenv": "*"
+  }
+}
