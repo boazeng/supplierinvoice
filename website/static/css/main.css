@@ -209,7 +209,6 @@ body {
     border-collapse: collapse;
     background: var(--bg-card);
     border-radius: var(--radius);
-    overflow: hidden;
     border: 1px solid var(--border);
 }
 
@@ -624,7 +623,7 @@ body {
     box-shadow: 0 6px 16px rgba(28,27,25,0.12);
     max-height: 200px;
     overflow-y: auto;
-    z-index: 500;
+    z-index: 9999;
     list-style: none;
     margin: 0;
     padding: 4px 0;
