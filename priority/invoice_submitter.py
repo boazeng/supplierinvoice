@@ -91,9 +91,19 @@ async def submit_approved_invoice(
         logger.info("חשבונית נקלטה בפריורטי בהצלחה — IVNUM: %s", invoice.priority_invoice_id)
     except Exception as e:
         import httpx as _httpx
+        import json as _json
         detail = str(e)
         if isinstance(e, _httpx.HTTPStatusError):
-            detail = e.response.text
+            raw = e.response.text
+            try:
+                parsed = _json.loads(raw)
+                detail = (
+                    parsed.get("FORM", {}).get("InterfaceErrors", {}).get("text")
+                    or parsed.get("error", {}).get("message")
+                    or raw
+                )
+            except Exception:
+                detail = raw
         invoice.status = InvoiceStatus.PENDING_SUBMISSION
         invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
         logger.error("שגיאה בקליטה: %s", detail)
