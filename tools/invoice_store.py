@@ -131,6 +131,7 @@ class InvoiceStore:
             extracted_data=extracted_data,
             priority_validation=raw.get("priority_validation", {}),
             priority_invoice_id=raw.get("priority_invoice_id", ""),
+            priority_journal_id=raw.get("priority_journal_id", ""),
             user_notes=raw.get("user_notes", ""),
             error_message=raw.get("error_message", ""),
             created_at=raw.get("created_at", ""),

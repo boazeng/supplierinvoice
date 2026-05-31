@@ -99,6 +99,7 @@ class Invoice:
     extracted_data: Optional[InvoiceData] = None
     priority_validation: dict = field(default_factory=dict)
     priority_invoice_id: str = ""       # IVNUM שהתקבל מ-Priority לאחר קליטה
+    priority_journal_id: str = ""       # FNCNUM — מספר תנועת יומן בפריורטי
     user_notes: str = ""
     error_message: str = ""
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())

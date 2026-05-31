@@ -381,7 +381,10 @@ const app = {
             on_hold: 'בהמתנה',
             cancelled: 'בוטל',
         };
-        statusDisplay.textContent = statusLabels[s] || s;
+        let statusText = statusLabels[s] || s;
+        if (inv.priority_invoice_id) statusText += ` · IVNUM: ${inv.priority_invoice_id}`;
+        if (inv.priority_journal_id) statusText += ` · תנועת יומן: ${inv.priority_journal_id}`;
+        statusDisplay.textContent = statusText;
         statusDisplay.className = `status-display status-badge status-${s}`;
         statusDisplay.style.display = 'block';
     },

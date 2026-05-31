@@ -133,42 +133,51 @@ class PriorityClient:
         logger.info("שולח חשבונית לפריורטי: %s", invoice_data.get("IVNUM", ""))
         return await self._post("PINVOICES", invoice_data)
 
-    async def attach_file(self, ivnum: str, file_path: str) -> bool:
-        """מצרף קובץ לנספחים של חשבונית קיימת ב-Priority."""
-        import base64
-        from pathlib import Path
-        p = Path(file_path)
-        if not p.exists():
-            logger.warning("קובץ לא נמצא לצירוף: %s", file_path)
-            return False
-        suffix = p.suffix.lstrip(".").lower()
-        b64 = base64.b64encode(p.read_bytes()).decode("ascii")
-        entity = f"PINVOICES('{ivnum}')/EXTFILES_SUBFORM"
-        try:
-            await self._post(entity, {
-                "EXTFILEDES": p.name,
-                "SUFFIX": suffix,
-                "EXTFILENAME": b64,
-            })
-            logger.info("קובץ צורף בהצלחה ל-IVNUM %s", ivnum)
-            return True
-        except Exception as e:
-            logger.warning("לא ניתן לצרף קובץ ל-%s: %s", ivnum, e)
-            return False
+    def _pinvoice_key(self, ivnum: str, ivtype: str = "P", debit: str = "D") -> str:
+        """מחזיר את המפתח המורכב של PINVOICES לפי OData."""
+        return f"PINVOICES(IVNUM='{ivnum}',IVTYPE='{ivtype}',DEBIT='{debit}')"
 
-    async def close_invoice(self, ivnum: str) -> bool:
-        """מבצע CLOSEPRINTPIV על חשבונית קיימת (אישור וסגירה)."""
-        client = await self._get_client()
-        url = f"{self.base_url}/PINVOICES('{ivnum}')/CLOSEPRINTPIV"
-        logger.info("שולח CLOSEPRINTPIV ל-IVNUM %s", ivnum)
+    async def finalize_invoice(self, ivnum: str, file_path: str = "") -> str:
+        """
+        מצרף קובץ ומבצע CLOSEPRINTPIV על חשבונית דרך WCF SDK.
+        מחזיר את מספר תנועת היומן (FNCNUM) או מחרוזת ריקה בכישלון.
+        """
+        import asyncio
+        import json as _json
+        import subprocess
+        from pathlib import Path
+
+        js_script = Path(__file__).parent / "finalize_invoice.js"
+        if not js_script.exists():
+            logger.warning("finalize_invoice.js לא נמצא")
+            return ""
+
+        args = ["node", str(js_script), ivnum]
+        if file_path and Path(file_path).exists():
+            args.append(file_path)
+
+        logger.info("מריץ finalize_invoice.js עבור IVNUM %s", ivnum)
         try:
-            response = await client.post(url, json={})
-            response.raise_for_status()
-            logger.info("CLOSEPRINTPIV הצליח ל-IVNUM %s", ivnum)
-            return True
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(Path(__file__).parent),
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            if stderr:
+                logger.debug("finalize_invoice stderr: %s", stderr.decode(errors="replace"))
+            result = _json.loads(stdout.decode().strip())
+            if result.get("ok"):
+                fncnum = result.get("fncnum", "")
+                logger.info("finalize_invoice הצליח — FNCNUM: %s", fncnum)
+                return fncnum
+            else:
+                logger.warning("finalize_invoice נכשל: %s", result.get("error"))
+                return ""
         except Exception as e:
-            logger.warning("CLOSEPRINTPIV נכשל ל-%s: %s", ivnum, e)
-            return False
+            logger.warning("שגיאה ב-finalize_invoice: %s", e)
+            return ""
 
     # --- בדיקת חיבור ---
 

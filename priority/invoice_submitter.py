@@ -47,18 +47,33 @@ async def _finalize_in_priority(
     is_new: bool,
 ) -> None:
     """
-    אחרי קליטה מוצלחת (חדשה או כפולה שנמצאה):
-    - מצרף קובץ לנספחים (רק לחשבוניות חדשות — כפולות כבר סגורות)
-    - מבצע CLOSEPRINTPIV
+    אחרי קליטה מוצלחת:
+    - מצרף קובץ ומבצע CLOSEPRINTPIV דרך WCF SDK (לחשבוניות חדשות)
+    - לחשבוניות כפולות שנמצאו — רק קריאת FNCNUM
     """
     ivnum = invoice.priority_invoice_id
     if not ivnum:
         return
 
-    if is_new and invoice.file_path:
-        await priority_client.attach_file(ivnum, invoice.file_path)
-
-    await priority_client.close_invoice(ivnum)
+    if is_new:
+        fncnum = await priority_client.finalize_invoice(
+            ivnum, invoice.file_path if invoice.file_path else ""
+        )
+        if fncnum:
+            invoice.priority_journal_id = fncnum
+    else:
+        # חשבונית כבר קיימת — נקרא FNCNUM בלבד
+        result = await priority_client._get(
+            "PINVOICES",
+            params={
+                "$filter": f"IVNUM eq '{ivnum}'",
+                "$select": "IVNUM,FNCNUM",
+                "$top": "1",
+            },
+        )
+        fncnum = (result or {}).get("value", [{}])[0].get("FNCNUM", "") or ""
+        if fncnum:
+            invoice.priority_journal_id = str(fncnum)
 
 
 async def submit_approved_invoice(
