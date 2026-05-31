@@ -613,17 +613,14 @@ body {
 }
 .ac-dd {
     display: none;
-    position: absolute;
-    top: calc(100% + 2px);
-    right: 0;
-    left: 0;
+    position: fixed;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: 0 6px 16px rgba(28,27,25,0.12);
-    max-height: 200px;
+    max-height: 220px;
     overflow-y: auto;
-    z-index: 9999;
+    z-index: 99999;
     list-style: none;
     margin: 0;
     padding: 4px 0;

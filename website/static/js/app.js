@@ -1081,6 +1081,11 @@ const app = {
                 let obj = this.currentInvoice.extracted_data;
                 for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
                 obj[parts[parts.length - 1]] = value;
+                // רענון תנועת יומן אם שונה שדה סכום
+                const amountFields = ['subtotal', 'vat_amount', 'total_amount'];
+                if (amountFields.includes(parts[parts.length - 1])) {
+                    this.renderTransactionPreview(this.currentInvoice);
+                }
             }
         } catch (err) {
             input.style.borderColor = '#f44336';
@@ -1115,6 +1120,16 @@ const app = {
             const dd = input.nextElementSibling;
             let timer = null;
 
+            const positionDd = () => {
+                const rect = input.getBoundingClientRect();
+                dd.style.position = 'fixed';
+                dd.style.top = (rect.bottom + 2) + 'px';
+                dd.style.left = rect.left + 'px';
+                dd.style.width = Math.max(240, rect.width) + 'px';
+                dd.style.right = 'auto';
+                dd.style.zIndex = '99999';
+            };
+
             const search = async (q, showAll = false) => {
                 if (!showAll && !q.trim()) { dd.style.display = 'none'; return; }
                 try {
@@ -1128,6 +1143,7 @@ const app = {
                         const display = name ? `${code} — ${name}` : code;
                         return `<li data-val="${code.replace(/"/g, '&quot;')}">${display}</li>`;
                     }).join('');
+                    positionDd();
                     dd.style.display = 'block';
                 } catch { dd.style.display = 'none'; }
             };

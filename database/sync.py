@@ -143,7 +143,7 @@ async def sync_accounts(client: PriorityClient) -> int:
     """מסנכרן חשבונות GL מפריורטי ל-DB."""
     logger.info("מתחיל סנכרון חשבונות...")
     result = await client._get("ACCOUNTS", params={
-        "$select": "ACCOUNT,ACCOUNTDES",
+        "$select": "ACCNAME,ACCDES",
         "$top": "2000",
     })
     if not result or not result.get("value"):
@@ -151,8 +151,8 @@ async def sync_accounts(client: PriorityClient) -> int:
         return 0
 
     records = [
-        {"account_code": a["ACCOUNT"], "account_name": a.get("ACCOUNTDES", "")}
-        for a in result["value"] if a.get("ACCOUNT")
+        {"account_code": a["ACCNAME"], "account_name": a.get("ACCDES", "")}
+        for a in result["value"] if a.get("ACCNAME")
     ]
     count = db.bulk_upsert_accounts(records)
     logger.info("סנכרון חשבונות הושלם — סה\"כ %d", count)
