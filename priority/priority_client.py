@@ -170,14 +170,15 @@ class PriorityClient:
             result = _json.loads(stdout.decode().strip())
             if result.get("ok"):
                 fncnum = result.get("fncnum", "")
-                logger.info("finalize_invoice הצליח — FNCNUM: %s", fncnum)
-                return fncnum
+                ivnum  = result.get("ivnum", "")
+                logger.info("finalize_invoice הצליח — IVNUM: %s, FNCNUM: %s", ivnum, fncnum)
+                return {"ivnum": ivnum, "fncnum": fncnum}
             else:
                 logger.warning("finalize_invoice נכשל: %s", result.get("error"))
-                return ""
+                return {}
         except Exception as e:
             logger.warning("שגיאה ב-finalize_invoice: %s", e)
-            return ""
+            return {}
 
     # --- בדיקת חיבור ---
 

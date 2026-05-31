@@ -94,19 +94,20 @@ async function main() {
   );
   process.stderr.write(`CLOSEPRINTPIV result: ${JSON.stringify(closeResult)}\n`);
 
-  // קריאת FNCNUM אחרי הסגירה
+  // קריאת IVNUM ו-FNCNUM אחרי הסגירה
   const rowsAfter = await withTimeout(
     new Promise((res, rej) => form.getRows(1, res, rej)),
     15000, 'getRows after close'
   );
   process.stderr.write(`Rows after: ${JSON.stringify(rowsAfter)}\n`);
 
-  const fncnum = (rowsAfter && rowsAfter.PINVOICES && rowsAfter.PINVOICES[0]
-    ? rowsAfter.PINVOICES[0].FNCNUM : null) || '';
+  const row    = rowsAfter && rowsAfter.PINVOICES && rowsAfter.PINVOICES[0] ? rowsAfter.PINVOICES[0] : {};
+  const fncnum = row.FNCNUM || '';
+  const ivnum  = row.IVNUM  || '';   // ה-IVNUM הסופי (לא T-number) לאחר CLOSEPRINTPIV
 
   await withTimeout(new Promise((res, rej) => form.endCurrentForm(false, res, rej)), 15000, 'endForm');
 
-  console.log(JSON.stringify({ ok: true, fncnum }));
+  console.log(JSON.stringify({ ok: true, fncnum, ivnum }));
 }
 
 main().catch(err => {

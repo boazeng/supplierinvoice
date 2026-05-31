@@ -41,28 +41,47 @@ def _build_priority_payload(data: InvoiceData) -> dict:
     return payload
 
 
+def _is_temp_ivnum(ivnum: str) -> bool:
+    """מחזיר True אם ה-IVNUM הוא זמני (מתחיל ב-T)."""
+    return ivnum.upper().startswith("T")
+
+
 async def _finalize_in_priority(
     invoice: Invoice,
     priority_client: PriorityClient,
     is_new: bool,
 ) -> None:
     """
-    אחרי קליטה מוצלחת:
-    - מצרף קובץ ומבצע CLOSEPRINTPIV דרך WCF SDK (לחשבוניות חדשות)
-    - לחשבוניות כפולות שנמצאו — רק קריאת FNCNUM
+    אחרי קליטה ראשונית בפריורטי:
+    - לחשבוניות חדשות עם T-number: מריץ CLOSEPRINTPIV + צירוף קובץ (WCF SDK)
+      → מעדכן IVNUM סופי + FNCNUM, מעביר לסטטוס PENDING_FILING
+      → אם נכשל — נשאר PENDING_SUBMISSION עם הודעת שגיאה
+    - לחשבוניות כפולות שנמצאו (IVNUM סופי כבר): קורא FNCNUM ומעביר ל-PENDING_FILING
     """
     ivnum = invoice.priority_invoice_id
     if not ivnum:
         return
 
-    if is_new:
-        fncnum = await priority_client.finalize_invoice(
+    if _is_temp_ivnum(ivnum):
+        # מספר זמני (T) — צריך CLOSEPRINTPIV בין אם חדש ובין אם כפול
+        result = await priority_client.finalize_invoice(
             ivnum, invoice.file_path if invoice.file_path else ""
         )
-        if fncnum:
-            invoice.priority_journal_id = fncnum
+        final_ivnum = result.get("ivnum", "")
+        fncnum      = result.get("fncnum", "")
+
+        if final_ivnum and not _is_temp_ivnum(final_ivnum):
+            invoice.priority_invoice_id  = final_ivnum
+            invoice.priority_journal_id  = fncnum
+            invoice.status               = InvoiceStatus.PENDING_FILING
+            invoice.error_message        = ""
+            logger.info("CLOSEPRINTPIV הצליח — IVNUM: %s, FNCNUM: %s", final_ivnum, fncnum)
+        else:
+            invoice.status        = InvoiceStatus.PENDING_SUBMISSION
+            invoice.error_message = "CLOSEPRINTPIV לא הצליח — החשבונית ממתינה לאישור ידני בפריורטי"
+            logger.warning("CLOSEPRINTPIV לא הפיק IVNUM סופי עבור %s", ivnum)
     else:
-        # חשבונית כבר קיימת — נקרא FNCNUM בלבד
+        # חשבונית כבר קיימת עם IVNUM סופי — קרא FNCNUM וסמן כמוכן לתיוק
         result = await priority_client._get(
             "PINVOICES",
             params={
@@ -74,6 +93,7 @@ async def _finalize_in_priority(
         fncnum = (result or {}).get("value", [{}])[0].get("FNCNUM", "") or ""
         if fncnum:
             invoice.priority_journal_id = str(fncnum)
+        invoice.status = InvoiceStatus.PENDING_FILING
 
 
 async def submit_approved_invoice(
@@ -106,10 +126,9 @@ async def submit_approved_invoice(
     try:
         result = await priority_client.submit_invoice(payload)
         invoice.priority_invoice_id = result.get("IVNUM", "")
-        invoice.status = InvoiceStatus.PENDING_FILING
         invoice.error_message = ""
         is_new = True
-        logger.info("חשבונית נקלטה בפריורטי בהצלחה — IVNUM: %s", invoice.priority_invoice_id)
+        logger.info("חשבונית נקלטה בפריורטי — IVNUM: %s", invoice.priority_invoice_id)
     except Exception as e:
         import httpx as _httpx
         import json as _json
@@ -152,7 +171,8 @@ async def submit_approved_invoice(
             invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
             logger.error("שגיאה בקליטה: %s", detail)
 
-    if invoice.status == InvoiceStatus.PENDING_FILING:
+    # הפעל finalize אם יש IVNUM — בין אם חדש (T-number) ובין אם כפול (קיים)
+    if invoice.priority_invoice_id:
         await _finalize_in_priority(invoice, priority_client, is_new)
 
     invoice.updated_at = datetime.now().isoformat()
