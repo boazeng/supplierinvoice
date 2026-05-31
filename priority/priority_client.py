@@ -133,6 +133,43 @@ class PriorityClient:
         logger.info("שולח חשבונית לפריורטי: %s", invoice_data.get("IVNUM", ""))
         return await self._post("PINVOICES", invoice_data)
 
+    async def attach_file(self, ivnum: str, file_path: str) -> bool:
+        """מצרף קובץ לנספחים של חשבונית קיימת ב-Priority."""
+        import base64
+        from pathlib import Path
+        p = Path(file_path)
+        if not p.exists():
+            logger.warning("קובץ לא נמצא לצירוף: %s", file_path)
+            return False
+        suffix = p.suffix.lstrip(".").lower()
+        b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+        entity = f"PINVOICES('{ivnum}')/EXTFILES_SUBFORM"
+        try:
+            await self._post(entity, {
+                "EXTFILEDES": p.name,
+                "SUFFIX": suffix,
+                "EXTFILENAME": b64,
+            })
+            logger.info("קובץ צורף בהצלחה ל-IVNUM %s", ivnum)
+            return True
+        except Exception as e:
+            logger.warning("לא ניתן לצרף קובץ ל-%s: %s", ivnum, e)
+            return False
+
+    async def close_invoice(self, ivnum: str) -> bool:
+        """מבצע CLOSEPRINTPIV על חשבונית קיימת (אישור וסגירה)."""
+        client = await self._get_client()
+        url = f"{self.base_url}/PINVOICES('{ivnum}')/CLOSEPRINTPIV"
+        logger.info("שולח CLOSEPRINTPIV ל-IVNUM %s", ivnum)
+        try:
+            response = await client.post(url, json={})
+            response.raise_for_status()
+            logger.info("CLOSEPRINTPIV הצליח ל-IVNUM %s", ivnum)
+            return True
+        except Exception as e:
+            logger.warning("CLOSEPRINTPIV נכשל ל-%s: %s", ivnum, e)
+            return False
+
     # --- בדיקת חיבור ---
 
     async def health_check(self) -> bool:

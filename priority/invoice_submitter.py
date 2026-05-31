@@ -57,6 +57,26 @@ def _build_priority_payload(data: InvoiceData, file_path: str = "") -> dict:
     return payload
 
 
+async def _finalize_in_priority(
+    invoice: Invoice,
+    priority_client: PriorityClient,
+    is_new: bool,
+) -> None:
+    """
+    אחרי קליטה מוצלחת (חדשה או כפולה שנמצאה):
+    - מצרף קובץ לנספחים (רק לחשבוניות חדשות — כפולות כבר סגורות)
+    - מבצע CLOSEPRINTPIV
+    """
+    ivnum = invoice.priority_invoice_id
+    if not ivnum:
+        return
+
+    if is_new and invoice.file_path:
+        await priority_client.attach_file(ivnum, invoice.file_path)
+
+    await priority_client.close_invoice(ivnum)
+
+
 async def submit_approved_invoice(
     invoice: Invoice,
     priority_client: PriorityClient,
@@ -83,11 +103,13 @@ async def submit_approved_invoice(
 
     payload = _build_priority_payload(invoice.extracted_data, invoice.file_path)
 
+    is_new = False
     try:
         result = await priority_client.submit_invoice(payload)
         invoice.priority_invoice_id = result.get("IVNUM", "")
         invoice.status = InvoiceStatus.PENDING_FILING
         invoice.error_message = ""
+        is_new = True
         logger.info("חשבונית נקלטה בפריורטי בהצלחה — IVNUM: %s", invoice.priority_invoice_id)
     except Exception as e:
         import httpx as _httpx
@@ -130,6 +152,9 @@ async def submit_approved_invoice(
             invoice.status = InvoiceStatus.PENDING_SUBMISSION
             invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
             logger.error("שגיאה בקליטה: %s", detail)
+
+    if invoice.status == InvoiceStatus.PENDING_FILING:
+        await _finalize_in_priority(invoice, priority_client, is_new)
 
     invoice.updated_at = datetime.now().isoformat()
     store.save(invoice)
