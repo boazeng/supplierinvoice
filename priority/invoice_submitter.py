@@ -104,9 +104,32 @@ async def submit_approved_invoice(
                 )
             except Exception:
                 detail = raw
-        invoice.status = InvoiceStatus.PENDING_SUBMISSION
-        invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
-        logger.error("שגיאה בקליטה: %s", detail)
+
+        # אם פריורטי דוחה בגלל מספר חשבונית כפול — החשבונית כבר קיימת שם
+        is_duplicate = "כבר קיימת" in detail or "already exists" in detail.lower()
+        if is_duplicate:
+            existing = await priority_client._get(
+                "PINVOICES",
+                params={
+                    "$filter": f"BOOKNUM eq '{invoice.extracted_data.invoice_number}' and SUPNAME eq '{invoice.extracted_data.supplier.priority_supplier_code}'",
+                    "$select": "IVNUM,BOOKNUM,SUPNAME",
+                    "$top": "1",
+                },
+            )
+            ivnum = (existing or {}).get("value", [{}])[0].get("IVNUM", "") if existing else ""
+            if ivnum:
+                invoice.priority_invoice_id = ivnum
+                invoice.status = InvoiceStatus.PENDING_FILING
+                invoice.error_message = ""
+                logger.info("חשבונית כבר קיימת בפריורטי — IVNUM: %s", ivnum)
+            else:
+                invoice.status = InvoiceStatus.PENDING_SUBMISSION
+                invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
+                logger.error("שגיאה בקליטה: %s", detail)
+        else:
+            invoice.status = InvoiceStatus.PENDING_SUBMISSION
+            invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
+            logger.error("שגיאה בקליטה: %s", detail)
 
     invoice.updated_at = datetime.now().isoformat()
     store.save(invoice)
