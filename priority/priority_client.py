@@ -137,20 +137,39 @@ class PriorityClient:
         """מחזיר את המפתח המורכב של PINVOICES לפי OData."""
         return f"PINVOICES(IVNUM='{ivnum}',IVTYPE='{ivtype}',DEBIT='{debit}')"
 
-    async def finalize_invoice(self, ivnum: str, file_path: str = "") -> str:
+    async def finalize_invoice(self, ivnum: str, file_path: str = "") -> dict:
         """
         מצרף קובץ ומבצע CLOSEPRINTPIV על חשבונית דרך WCF SDK.
-        מחזיר את מספר תנועת היומן (FNCNUM) או מחרוזת ריקה בכישלון.
+        מחזיר {"ivnum": ..., "fncnum": ...} בהצלחה או {} בכישלון.
         """
         import asyncio
         import json as _json
-        import subprocess
         from pathlib import Path
 
-        js_script = Path(__file__).parent / "finalize_invoice.js"
+        priority_dir = Path(__file__).parent
+        js_script = priority_dir / "finalize_invoice.js"
         if not js_script.exists():
             logger.warning("finalize_invoice.js לא נמצא")
-            return ""
+            return {}
+
+        # אם node_modules חסר — הרץ npm install לפני ההרצה
+        node_modules = priority_dir / "node_modules"
+        if not node_modules.exists():
+            logger.info("node_modules חסר — מריץ npm install...")
+            try:
+                install = await asyncio.create_subprocess_exec(
+                    "npm", "install", "--production",
+                    cwd=str(priority_dir),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                _, install_err = await asyncio.wait_for(install.communicate(), timeout=180)
+                if install_err:
+                    logger.info("npm install stderr: %s", install_err.decode(errors="replace")[:500])
+                logger.info("npm install הושלם")
+            except Exception as e:
+                logger.error("npm install נכשל: %s", e)
+                return {}
 
         args = ["node", str(js_script), ivnum]
         if file_path and Path(file_path).exists():
@@ -162,12 +181,16 @@ class PriorityClient:
                 *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(Path(__file__).parent),
+                cwd=str(priority_dir),
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=180)
             if stderr:
-                logger.debug("finalize_invoice stderr: %s", stderr.decode(errors="replace"))
-            result = _json.loads(stdout.decode().strip())
+                logger.info("finalize_invoice stderr: %s", stderr.decode(errors="replace")[:1000])
+            raw = stdout.decode().strip()
+            if not raw:
+                logger.warning("finalize_invoice לא החזיר פלט")
+                return {}
+            result = _json.loads(raw)
             if result.get("ok"):
                 fncnum = result.get("fncnum", "")
                 ivnum  = result.get("ivnum", "")

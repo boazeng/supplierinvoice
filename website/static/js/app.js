@@ -910,7 +910,8 @@ const app = {
             this.closeModal();
             this.loadInvoices();
         } catch (err) {
-            this.showToast('שגיאת תקשורת', 'error');
+            this.showToast('שגיאת תקשורת: ' + (err.message || err), 'error');
+            console.error('fileToLedger error:', err);
         }
     },
 

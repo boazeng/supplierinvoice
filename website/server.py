@@ -98,7 +98,12 @@ async def github_deploy(request: Request):
     expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, expected):
         raise HTTPException(status_code=403, detail="invalid signature")
-    subprocess.Popen(["bash", "-c", "sleep 1 && git -C /home/ubuntu/supplierinvoice pull && sudo systemctl restart supplierinvoice"])
+    subprocess.Popen(["bash", "-c",
+        "sleep 1"
+        " && git -C /home/ubuntu/supplierinvoice pull"
+        " && cd /home/ubuntu/supplierinvoice/priority && npm install --production --silent"
+        " && sudo systemctl restart supplierinvoice"
+    ])
     return {"ok": True}
 
 
