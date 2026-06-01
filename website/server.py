@@ -101,6 +101,7 @@ async def github_deploy(request: Request):
     subprocess.Popen(["bash", "-c",
         "sleep 1"
         " && git -C /home/ubuntu/supplierinvoice pull"
+        " && (command -v node || (curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs))"
         " && cd /home/ubuntu/supplierinvoice/priority && npm install --production --silent"
         " && sudo systemctl restart supplierinvoice"
     ])

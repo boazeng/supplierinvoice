@@ -152,6 +152,18 @@ class PriorityClient:
             logger.warning("finalize_invoice.js לא נמצא")
             return {}
 
+        # בדיקה ש-node מותקן
+        try:
+            node_check = await asyncio.create_subprocess_exec(
+                "node", "--version",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            node_out, _ = await asyncio.wait_for(node_check.communicate(), timeout=5)
+            logger.info("Node.js version: %s", node_out.decode().strip())
+        except Exception:
+            logger.error("Node.js לא מותקן — CLOSEPRINTPIV לא יפעל. הרץ deploy להתקנה.")
+            return {}
+
         # אם node_modules חסר — הרץ npm install לפני ההרצה
         node_modules = priority_dir / "node_modules"
         if not node_modules.exists():
