@@ -414,15 +414,56 @@ const app = {
         const total = parseFloat(d.total_amount) || 0;
         const expenseAcc = (d.expense_account || '').trim();
         const supplierAcc = ((d.supplier && d.supplier.priority_supplier_code) || '').trim();
+        const lines = Array.isArray(d.lines) ? d.lines.filter(l => l && (l.description || l.total_price)) : [];
 
-        const money = n => n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const money = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        // שדה חשבון עם autocomplete
         const acInput = (path, val) => `<span class="ac-field" style="position:relative">
             <input class="edit-field ac-input tx-acc-input" data-path="${path}" data-ep="/api/db/accounts/search"
                 value="${val}" placeholder="— חסר —" autocomplete="off" spellcheck="false"
                 style="width:90px;font-size:0.82rem;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg-primary);color:var(--text-primary)">
-            <ul class="ac-dd"></ul></span>${sfx ? `<span style="font-size:0.8rem;color:var(--text-secondary)">-${branch}</span>` : ''}`;
+            <ul class="ac-dd"></ul></span>${sfx ? `<span style="font-size:0.8rem;color:var(--text-secondary)"> -${branch}</span>` : ''}`;
 
-        const dr = subtotal + vat;
+        // שדה סכום עריכה
+        const amtInput = (path, val) => `<input class="edit-field tx-amt-input" data-path="${path}"
+            value="${parseFloat(val) || 0}"
+            style="width:80px;font-size:0.82rem;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg-primary);color:var(--text-primary);text-align:left" type="number" step="0.01" min="0">`;
+
+        // בניית שורות החובה — אם יש שורות חשבונית, נציג אותן; אחרת שורה אחת מסך
+        let debitRows = '';
+        let totalDebit = 0;
+
+        if (lines.length > 0) {
+            // שורה לכל פריט בחשבונית
+            lines.forEach((ln, i) => {
+                const amt = parseFloat(ln.total_price || ln.unit_price || 0);
+                totalDebit += amt;
+                const desc = ln.description || `שורה ${i + 1}`;
+                debitRows += `<tr>
+                    <td>${acInput('expense_account', expenseAcc)}</td>
+                    <td style="font-size:0.82rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc}">${desc}</td>
+                    <td>₪${money(amt)}</td><td></td></tr>`;
+            });
+            // אם סכום שורות שונה מ-subtotal — נציג גם subtotal לעריכה
+            if (Math.abs(totalDebit - subtotal) > 0.01) {
+                debitRows += `<tr style="font-size:0.78rem;color:var(--text-secondary)">
+                    <td colspan="2">סכום שורות vs. סיכום: ${money(totalDebit)} / ${money(subtotal)}</td><td></td><td></td></tr>`;
+            }
+        } else {
+            // שורה אחת עם סכום ניתן לעריכה
+            totalDebit = subtotal;
+            debitRows = `<tr>
+                <td>${acInput('expense_account', expenseAcc)}</td>
+                <td>הוצאות</td>
+                <td>${amtInput('subtotal', subtotal)}</td><td></td></tr>`;
+        }
+
+        const vatRow = vat > 0 ? `<tr>
+            <td style="font-size:0.82rem">205-2${sfx}</td><td>מע"מ תשומות</td>
+            <td>${amtInput('vat_amount', vat)}</td><td></td></tr>` : '';
+
+        const dr = (lines.length > 0 ? totalDebit : subtotal) + vat;
         const cr = total;
         const balanced = Math.abs(dr - cr) < 0.01;
 
@@ -434,18 +475,18 @@ const app = {
         box.innerHTML = `
             <h4 style="margin:0 0 6px;color:var(--accent)">תנועת יומן — תצוגה מקדימה</h4>
             <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px">
-                סוג תנועה: חשבונית ספק · סניף: ${branch || '—'}</div>
+                סוג תנועה: חשבונית ספק · סניף: ${branch || '—'}
+                ${lines.length > 0 ? ` · <span style="color:var(--success)">${lines.length} שורות פריטים</span>` : ''}</div>
             ${warn ? `<div style="color:var(--danger);font-size:0.82rem;margin-bottom:8px">${warn}</div>` : ''}
             <table class="invoice-table" style="width:100%">
                 <thead><tr><th>חשבון</th><th>תיאור</th><th>חובה</th><th>זכות</th></tr></thead>
                 <tbody>
-                    <tr><td>${acInput('expense_account', expenseAcc)}</td><td>חשבון הוצאות</td>
-                        <td>₪${money(subtotal)}</td><td></td></tr>
-                    ${vat > 0 ? `<tr><td>205-2${sfx}</td><td>מע"מ תשומות</td>
-                        <td>₪${money(vat)}</td><td></td></tr>` : ''}
-                    <tr><td>${acInput('supplier.priority_supplier_code', supplierAcc)}</td>
+                    ${debitRows}
+                    ${vatRow}
+                    <tr>
+                        <td>${acInput('supplier.priority_supplier_code', supplierAcc)}</td>
                         <td>${(d.supplier && d.supplier.name) || 'ספק'}</td>
-                        <td></td><td>₪${money(cr)}</td></tr>
+                        <td></td><td>${amtInput('total_amount', total)}</td></tr>
                     <tr style="font-weight:700;border-top:2px solid var(--border)">
                         <td colspan="2">סה"כ</td>
                         <td>₪${money(dr)}</td><td>₪${money(cr)}</td></tr>
