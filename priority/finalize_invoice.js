@@ -6,7 +6,7 @@
  *   node finalize_invoice.js <IVNUM> <filePath>
  *
  * Returns JSON to stdout:
- *   { ok: true, fncnum: <n> }
+ *   { ok: true, fncnum: <n>, ivnum: <final> }
  *   { ok: false, error: "<message>" }
  */
 
@@ -32,6 +32,24 @@ function withTimeout(promise, ms, label) {
   return Promise.race([promise, t]);
 }
 
+/**
+ * בונה onShowMessage handler שמאשר אוטומטית כל הודעה מפריורטי.
+ * CLOSEPRINTPIV עשוי להציג דיאלוג אישור — בלי handler זה הפעולה תיתקע.
+ */
+function makeMessageHandler(label) {
+  return function onShowMessage(msg) {
+    process.stderr.write(`[${label}] Priority message: code=${msg.code} type=${msg.type} msg=${msg.message}\n`);
+    if (msg.form) {
+      try {
+        // warningConfirm(1) = OK/Yes לכל סוגי ההודעות
+        msg.form.warningConfirm(1);
+      } catch (e) {
+        try { msg.form.infoMsgConfirm(); } catch (_) {}
+      }
+    }
+  };
+}
+
 async function main() {
   const [ivnum, filePath] = process.argv.slice(2);
   if (!ivnum) throw new Error('Usage: node finalize_invoice.js <IVNUM> [filePath]');
@@ -53,7 +71,10 @@ async function main() {
   process.stderr.write(`Opening PINVOICES for ${ivnum}...\n`);
   const form = await withTimeout(
     new Promise((res, rej) => priority.formStartEx(
-      'PINVOICES', null, null, company, 1, { zoomValue: ivnum }, res, rej
+      'PINVOICES',
+      makeMessageHandler('PINVOICES'),  // onShowMessage — מאשר הודעות אוטומטית
+      null,
+      company, 1, { zoomValue: ivnum }, res, rej
     )),
     30000, 'formStartEx'
   );
@@ -69,7 +90,12 @@ async function main() {
   if (filePath && fs.existsSync(filePath)) {
     process.stderr.write('Opening EXTFILES subform...\n');
     const sub = await withTimeout(
-      new Promise((res, rej) => form.startSubForm('EXTFILES', null, null, res, rej)),
+      new Promise((res, rej) => form.startSubForm(
+        'EXTFILES',
+        makeMessageHandler('EXTFILES'),  // onShowMessage לתת-טופס
+        null,
+        res, rej
+      )),
       20000, 'startSubForm EXTFILES'
     );
     await withTimeout(new Promise((res, rej) => sub.newRow(res, rej)), 10000, 'newRow');
@@ -90,7 +116,7 @@ async function main() {
   process.stderr.write('Calling CLOSEPRINTPIV...\n');
   const closeResult = await withTimeout(
     new Promise((res, rej) => form.activateStart('CLOSEPRINTPIV', null, null, res, rej)),
-    30000, 'activateStart CLOSEPRINTPIV'
+    60000, 'activateStart CLOSEPRINTPIV'
   );
   process.stderr.write(`CLOSEPRINTPIV result: ${JSON.stringify(closeResult)}\n`);
 
@@ -103,11 +129,11 @@ async function main() {
 
   const row    = rowsAfter && rowsAfter.PINVOICES && rowsAfter.PINVOICES[0] ? rowsAfter.PINVOICES[0] : {};
   const fncnum = row.FNCNUM || '';
-  const ivnum  = row.IVNUM  || '';   // ה-IVNUM הסופי (לא T-number) לאחר CLOSEPRINTPIV
+  const ivnumFinal = row.IVNUM || '';
 
   await withTimeout(new Promise((res, rej) => form.endCurrentForm(false, res, rej)), 15000, 'endForm');
 
-  console.log(JSON.stringify({ ok: true, fncnum, ivnum }));
+  console.log(JSON.stringify({ ok: true, fncnum, ivnum: ivnumFinal }));
 }
 
 main().catch(err => {
