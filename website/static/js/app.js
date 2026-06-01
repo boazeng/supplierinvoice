@@ -906,7 +906,8 @@ const app = {
                 this.showToast(data.detail || 'שגיאה בתיוק', 'error');
                 return;
             }
-            this.showToast(`תויק בספרי הנהלת חשבונות — ${data.branch} / ${data.year}`, 'success');
+            const companyLabel = data.company_name || data.branch;
+            this.showToast(`תויק בספרי הנהלת חשבונות — ${companyLabel} / ${data.year}`, 'success');
             this.closeModal();
             this.loadInvoices();
         } catch (err) {

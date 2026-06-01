@@ -539,6 +539,9 @@ async def file_invoice_to_ledger(invoice_id: str):
 
     d = invoice.extracted_data
     branch = (d.customer.branch if d else "") or "כללי"
+    # שם החברה בספרים — שם הלקוח המלא, ואם חסר — קוד הסניף
+    customer_name = (d.customer.name if d else "") or ""
+    company_name = re.sub(r'[\\/:*?"<>|]', '_', customer_name or branch)
     supplier_name = re.sub(r'[\\/:*?"<>|]', '_', (d.supplier.name if d else "") or "ספק")
     invoice_num = re.sub(r'[\\/:*?"<>|]', '_', (d.invoice_number if d else "") or invoice_id[:8])
     invoice_date = (d.invoice_date if d else "") or date_cls.today().isoformat()
@@ -547,7 +550,7 @@ async def file_invoice_to_ledger(invoice_id: str):
     except (ValueError, TypeError):
         year = date_cls.today().year
 
-    company_id = ledger_db.find_or_create_company(branch)
+    company_id = ledger_db.find_or_create_company(company_name)
     book_id = ledger_db.find_or_create_book(company_id, year)
     divider_id = ledger_db.find_or_create_divider(book_id, supplier_name)
 
@@ -574,8 +577,8 @@ async def file_invoice_to_ledger(invoice_id: str):
     invoice.status = InvoiceStatus.FILED
     invoice.updated_at = datetime.now().isoformat()
     store.save(invoice)
-    logger.info("חשבונית %s תויקה בספרי הנהלת חשבונות — %s/%d", invoice_id, branch, year)
-    return {"ok": True, "branch": branch, "year": year}
+    logger.info("חשבונית %s תויקה בספרי הנהלת חשבונות — %s/%d", invoice_id, company_name, year)
+    return {"ok": True, "branch": branch, "company_name": company_name, "year": year}
 
 
 @app.post("/api/invoices/{invoice_id}/approve")
