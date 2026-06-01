@@ -22,7 +22,7 @@ from priority.priority_client import PriorityClient
 from priority.invoice_submitter import submit_approved_invoice
 from priority.sync_agent import sync_from_priority, get_sync_status
 from tools.invoice_store import InvoiceStore
-from config.settings import INVOICES_DIR, BASE_DIR
+from config.settings import INVOICES_DIR, BASE_DIR, DATA_DIR
 from database import db as companies_db
 from database import ledger_db
 from database.sync import sync_all as sync_companies_from_priority
