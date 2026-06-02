@@ -46,7 +46,7 @@ auth = install_auth(
         {"email": "boen01@gmail.com", "role": "admin"},
         {"email": "yael.israel303@gmail.com", "role": "admin"},
     ],
-    public_prefixes=("/api/health", "/api/cron/", "/api/deploy"),
+    public_prefixes=("/api/health", "/api/cron/", "/api/deploy", "/api/debug/"),
 )
 
 # --- מערכת ספרי הנהלת חשבונות ---
@@ -106,6 +106,30 @@ async def github_deploy(request: Request):
         " && sudo systemctl restart supplierinvoice"
     ])
     return {"ok": True}
+
+
+@app.get("/api/debug/node")
+async def debug_node():
+    """אבחון זמינות Node.js על השרת — ללא אימות."""
+    import asyncio, shutil
+    result = {}
+    for cmd in ["node", "nodejs"]:
+        path = shutil.which(cmd)
+        result[cmd] = {"found": path is not None, "path": path}
+        if path:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    cmd, "--version",
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                )
+                out, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+                result[cmd]["version"] = out.decode().strip()
+            except Exception as e:
+                result[cmd]["error"] = str(e)
+    node_modules = BASE_DIR / "priority" / "node_modules"
+    result["node_modules_exists"] = node_modules.exists()
+    result["node_modules_path"] = str(node_modules)
+    return result
 
 
 @app.get("/api/health")

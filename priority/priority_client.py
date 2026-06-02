@@ -152,17 +152,24 @@ class PriorityClient:
             logger.warning("finalize_invoice.js לא נמצא")
             return {}
 
-        # בדיקה ש-node מותקן
-        try:
-            node_check = await asyncio.create_subprocess_exec(
-                "node", "--version",
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-            )
-            node_out, _ = await asyncio.wait_for(node_check.communicate(), timeout=5)
-            logger.info("Node.js version: %s", node_out.decode().strip())
-        except Exception:
+        # בדיקה ש-node מותקן — Ubuntu לפעמים מתקין בשם "nodejs"
+        node_executable = None
+        for candidate in ["node", "nodejs"]:
+            try:
+                node_check = await asyncio.create_subprocess_exec(
+                    candidate, "--version",
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                )
+                node_out, _ = await asyncio.wait_for(node_check.communicate(), timeout=5)
+                if node_check.returncode == 0:
+                    node_executable = candidate
+                    logger.info("Node.js (%s) version: %s", candidate, node_out.decode().strip())
+                    break
+            except Exception:
+                continue
+        if not node_executable:
             logger.error("Node.js לא מותקן — CLOSEPRINTPIV לא יפעל. הרץ deploy להתקנה.")
-            return {}
+            return {"error": "node_not_installed"}
 
         # אם node_modules חסר — הרץ npm install לפני ההרצה
         node_modules = priority_dir / "node_modules"
@@ -183,7 +190,7 @@ class PriorityClient:
                 logger.error("npm install נכשל: %s", e)
                 return {}
 
-        args = ["node", str(js_script), ivnum]
+        args = [node_executable, str(js_script), ivnum]
         if file_path and Path(file_path).exists():
             args.append(file_path)
 
