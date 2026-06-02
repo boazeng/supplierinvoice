@@ -72,6 +72,10 @@ async function runProcedure(firstStep, label, ivnumVal) {
       return { ok: true };
     }
 
+    if (t === 'error_caught') return { ok: false, error: step.error || msg };
+
+    const proc = step.proc;
+
     if (t === 'client' || t === 'displayUrl') {
       // קריאה ל-clientContinue מאשרת לשרת שהלקוח טיפל בשלב ההדפסה — Priority ממשיך לסגור
       if (!proc || !proc.clientContinue) {
@@ -85,10 +89,6 @@ async function runProcedure(firstStep, label, ivnumVal) {
       ).catch(e => ({ type: 'error_caught', error: e.message }));
       continue;
     }
-
-    if (t === 'error_caught') return { ok: false, error: step.error || msg };
-
-    const proc = step.proc;
 
     if (t === 'message') {
       if (mtype === 'error') return { ok: false, error: msg || 'Procedure error' };
