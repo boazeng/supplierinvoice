@@ -348,9 +348,8 @@ const app = {
         // Notes
         document.getElementById('user-notes').value = inv.user_notes || '';
 
-        // כפתורי פעולה לפי סטטוס + תווית הסטטוס
+        // כפתורי פעולה לפי סטטוס
         const actionBtns = document.getElementById('action-buttons');
-        const statusDisplay = document.getElementById('status-display');
         const s = inv.status;
         const showBtn = (id, on) => {
             const el = document.getElementById(id);
@@ -367,20 +366,6 @@ const app = {
         showBtn('btn-cancel', s !== 'cancelled');
         // btn-delete-modal — תמיד גלוי
 
-        const statusLabels = {
-            pending_approval: 'ממתין לאישור',
-            pending_extraction: 'ממתין לפענוח',
-            pending_submission: 'ממתין לקליטה',
-            pending_filing: 'ממתין לתיוק',
-            on_hold: 'בהמתנה',
-            cancelled: 'בוטל',
-        };
-        let statusText = statusLabels[s] || s;
-        if (inv.priority_invoice_id) statusText += ` · IVNUM: ${inv.priority_invoice_id}`;
-        if (inv.priority_journal_id) statusText += ` · תנועת יומן: ${inv.priority_journal_id}`;
-        statusDisplay.textContent = statusText;
-        statusDisplay.className = `status-display status-badge status-${s}`;
-        statusDisplay.style.display = 'block';
     },
 
     closeModal() {
