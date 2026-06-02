@@ -100,8 +100,8 @@
             <select id="company-select" style="min-width:260px">
                 <option value="">— בחר חברה —</option>
             </select>
-            <button class="btn-ok" onclick="L.openNewCompany()">+ חברה חדשה</button>
             <button class="btn-light" onclick="L.importFromPriority()" id="btn-import-priority">↓ ייבא מ-Priority</button>
+            <button class="btn-danger btn-sm" id="btn-delete-company" style="display:none" onclick="L.deleteCompany()">🗑 מחק חברה</button>
         </div>
     </div>
 
@@ -189,6 +189,6 @@
 
 <div id="toast"></div>
 <script src="/static/js/tact-header.js"></script>
-<script src="/static/js/ledger.js?v=3"></script>
+<script src="/static/js/ledger.js?v=4"></script>
 </body>
 </html>

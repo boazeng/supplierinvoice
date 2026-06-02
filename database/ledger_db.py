@@ -85,6 +85,21 @@ def create_company(name: str, tax_id: str = "") -> int:
     return cid
 
 
+def delete_company(company_id: int) -> bool:
+    """מוחק חברה ואת כל הספרים והמסמכים שלה. מחזיר True אם נמחק."""
+    conn = _conn()
+    books = conn.execute("SELECT id FROM ledger_books WHERE company_id = ?", (company_id,)).fetchall()
+    for book in books:
+        bid = book["id"]
+        conn.execute("DELETE FROM ledger_documents WHERE book_id = ?", (bid,))
+        conn.execute("DELETE FROM ledger_dividers WHERE book_id = ?", (bid,))
+    conn.execute("DELETE FROM ledger_books WHERE company_id = ?", (company_id,))
+    cur = conn.execute("DELETE FROM ledger_companies WHERE id = ?", (company_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
 def find_or_create_company(name: str) -> int:
     """מחזיר id של חברה לפי שם — יוצר אם לא קיימת."""
     conn = _conn()

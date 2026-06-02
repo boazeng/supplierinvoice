@@ -76,8 +76,25 @@ const L = {
         } catch (e) { toast(e.message); }
     },
 
+    async deleteCompany() {
+        if (!L.company) return;
+        const sel = el('company-select');
+        const name = sel.options[sel.selectedIndex]?.text || '';
+        if (!confirm(`למחוק את "${name}"?\nכל הספרים והמסמכים שלה יימחקו לצמיתות.`)) return;
+        try {
+            await api(`/api/ledger/companies/${L.company}`, { method: 'DELETE' });
+            toast('החברה נמחקה');
+            el('btn-delete-company').style.display = 'none';
+            el('books-card').classList.add('hidden');
+            el('book-card').classList.add('hidden');
+            L.company = null;
+            await L.loadCompanies();
+        } catch (e) { toast(e.message); }
+    },
+
     async selectCompany(id) {
         L.company = id || null;
+        el('btn-delete-company').style.display = id ? 'inline-flex' : 'none';
         el('book-card').classList.add('hidden');
         L.bookId = null;
         if (!id) { el('books-card').classList.add('hidden'); return; }

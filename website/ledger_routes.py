@@ -51,6 +51,13 @@ def register_ledger_routes(app, templates_dir: Path) -> None:
         cid = ledger_db.create_company(name, body.get("tax_id", ""))
         return {"id": cid, "name": name}
 
+    @app.delete("/api/ledger/companies/{company_id}")
+    async def delete_company(company_id: int):
+        if not ledger_db.get_company(company_id):
+            raise HTTPException(404, "חברה לא נמצאה")
+        ledger_db.delete_company(company_id)
+        return {"ok": True}
+
     @app.post("/api/ledger/import-companies")
     async def import_companies_from_priority():
         """ייבוא כל תתי-החברות מ-Priority כחברות ב-ledger."""
