@@ -78,6 +78,29 @@ async def _finalize_in_priority(
             logger.info("CLOSEPRINTPIV הצליח — IVNUM: %s, FNCNUM: %s", final_ivnum, fncnum)
         else:
             err_detail = result.get("error", "") or result.get("stderr", "")
+            # T_NOT_FOUND: מספר זמני לא קיים בפריורטי — כנראה כבר הוסב; מחפשים לפי BOOKNUM
+            if err_detail and err_detail.startswith("T_NOT_FOUND:"):
+                logger.info("T-number לא נמצא, מחפש לפי BOOKNUM: %s", invoice.extracted_data.invoice_number if invoice.extracted_data else "?")
+                if invoice.extracted_data and invoice.extracted_data.invoice_number:
+                    sup = invoice.extracted_data.supplier.priority_supplier_code or ""
+                    lookup = await priority_client._get(
+                        "PINVOICES",
+                        params={
+                            "$filter": f"BOOKNUM eq '{invoice.extracted_data.invoice_number}' and SUPNAME eq '{sup}'",
+                            "$select": "IVNUM,FNCNUM",
+                            "$top": "1",
+                        },
+                    )
+                    found = (lookup or {}).get("value", [{}])[0]
+                    found_ivnum = found.get("IVNUM", "")
+                    found_fncnum = found.get("FNCNUM", "")
+                    if found_ivnum and not _is_temp_ivnum(found_ivnum):
+                        invoice.priority_invoice_id = found_ivnum
+                        invoice.priority_journal_id = str(found_fncnum)
+                        invoice.status = InvoiceStatus.PENDING_FILING
+                        invoice.error_message = ""
+                        logger.info("נמצא IVNUM סופי לפי BOOKNUM: %s, FNCNUM: %s", found_ivnum, found_fncnum)
+                        return
             invoice.status        = InvoiceStatus.PENDING_SUBMISSION
             invoice.error_message = f"CLOSEPRINTPIV נכשל: {err_detail}" if err_detail else "CLOSEPRINTPIV לא הצליח — בדוק יומן שרת"
             logger.warning("CLOSEPRINTPIV לא הפיק IVNUM סופי עבור %s — %s", ivnum, err_detail)

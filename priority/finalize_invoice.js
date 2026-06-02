@@ -188,11 +188,19 @@ async function main() {
   const initRow = (rowsInit && rowsInit.PINVOICES) ? (rowsInit.PINVOICES['1'] || Object.values(rowsInit.PINVOICES)[0] || {}) : {};
   process.stderr.write(`Initial IVNUM: ${initRow.IVNUM} FNCNUM: ${initRow.FNCNUM}\n`);
 
-  if (!isTempIvnum(initRow.IVNUM)) {
-    // חשבונית כבר סגורה
-    process.stderr.write('Invoice already finalized\n');
+  if (initRow.IVNUM && !isTempIvnum(initRow.IVNUM)) {
+    // חשבונית כבר סגורה עם IVNUM סופי
+    process.stderr.write(`Invoice already finalized: ${initRow.IVNUM}\n`);
     await form.endCurrentForm(false).catch(() => {});
-    console.log(JSON.stringify({ ok: true, fncnum: initRow.FNCNUM || '', ivnum: initRow.IVNUM || '' }));
+    console.log(JSON.stringify({ ok: true, fncnum: initRow.FNCNUM || '', ivnum: initRow.IVNUM }));
+    return;
+  }
+
+  if (!initRow.IVNUM) {
+    // T-number לא נמצא בפריורטי — כנראה כבר הוסב; מחזיר שגיאה ל-Python לטיפול
+    process.stderr.write(`T-number ${ivnum} not found in PINVOICES (may already be converted)\n`);
+    await form.endCurrentForm(false).catch(() => {});
+    console.log(JSON.stringify({ ok: false, error: `T_NOT_FOUND:${ivnum}` }));
     return;
   }
 
