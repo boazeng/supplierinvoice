@@ -397,17 +397,18 @@ const app = {
 
         const money = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+        const cellStyle = 'font-size:0.76rem;padding:3px 6px';
         // שדה חשבון עם autocomplete
         const acInput = (path, val) => `<span class="ac-field" style="position:relative">
             <input class="edit-field ac-input tx-acc-input" data-path="${path}" data-ep="/api/db/accounts/search"
                 value="${val}" placeholder="— חסר —" autocomplete="off" spellcheck="false"
-                style="width:90px;font-size:0.82rem;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg-primary);color:var(--text-primary)">
-            <ul class="ac-dd"></ul></span>${sfx ? `<span style="font-size:0.8rem;color:var(--text-secondary)"> -${branch}</span>` : ''}`;
+                style="width:82px;font-size:0.75rem;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--bg-primary);color:var(--text-primary)">
+            <ul class="ac-dd"></ul></span>${sfx ? `<span style="font-size:0.72rem;color:var(--text-secondary)"> -${branch}</span>` : ''}`;
 
         // שדה סכום עריכה
         const amtInput = (path, val) => `<input class="edit-field tx-amt-input" data-path="${path}"
             value="${parseFloat(val) || 0}"
-            style="width:80px;font-size:0.82rem;padding:2px 5px;border:1px solid var(--border);border-radius:4px;background:var(--bg-primary);color:var(--text-primary);text-align:left" type="number" step="0.01" min="0">`;
+            style="width:72px;font-size:0.75rem;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--bg-primary);color:var(--text-primary);text-align:left" type="number" step="0.01" min="0">`;
 
         // בניית שורות החובה — אם יש שורות חשבונית, נציג אותן; אחרת שורה אחת מסך
         let debitRows = '';
@@ -420,9 +421,9 @@ const app = {
                 totalDebit += amt;
                 const desc = ln.description || `שורה ${i + 1}`;
                 debitRows += `<tr>
-                    <td>${acInput('expense_account', expenseAcc)}</td>
-                    <td style="font-size:0.82rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc}">${desc}</td>
-                    <td>₪${money(amt)}</td><td></td></tr>`;
+                    <td style="${cellStyle}">${acInput('expense_account', expenseAcc)}</td>
+                    <td style="${cellStyle};max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc}">${desc}</td>
+                    <td style="${cellStyle}">₪${money(amt)}</td><td style="${cellStyle}"></td></tr>`;
             });
             // אם סכום שורות שונה מ-subtotal — נציג גם subtotal לעריכה
             if (Math.abs(totalDebit - subtotal) > 0.01) {
@@ -433,14 +434,14 @@ const app = {
             // שורה אחת עם סכום ניתן לעריכה
             totalDebit = subtotal;
             debitRows = `<tr>
-                <td>${acInput('expense_account', expenseAcc)}</td>
-                <td>הוצאות</td>
-                <td>${amtInput('subtotal', subtotal)}</td><td></td></tr>`;
+                <td style="${cellStyle}">${acInput('expense_account', expenseAcc)}</td>
+                <td style="${cellStyle}">הוצאות</td>
+                <td style="${cellStyle}">${amtInput('subtotal', subtotal)}</td><td style="${cellStyle}"></td></tr>`;
         }
 
         const vatRow = vat > 0 ? `<tr>
-            <td style="font-size:0.82rem">205-2${sfx}</td><td>מע"מ תשומות</td>
-            <td>${amtInput('vat_amount', vat)}</td><td></td></tr>` : '';
+            <td style="${cellStyle}">205-2${sfx}</td><td style="${cellStyle}">מע"מ תשומות</td>
+            <td style="${cellStyle}">${amtInput('vat_amount', vat)}</td><td style="${cellStyle}"></td></tr>` : '';
 
         const dr = (lines.length > 0 ? totalDebit : subtotal) + vat;
         const cr = total;
@@ -451,28 +452,30 @@ const app = {
         else if (!expenseAcc) warn = '⚠ לא הוזן חשבון הוצאות.';
         else if (!supplierAcc) warn = '⚠ הספק לא זוהה בפריורטי.';
 
+        const tdS = `style="${cellStyle}"`;
         box.innerHTML = `
-            <h4 style="margin:0 0 6px;color:var(--accent)">תנועת יומן — תצוגה מקדימה</h4>
-            <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px">
-                סוג תנועה: חשבונית ספק · סניף: ${branch || '—'}
-                ${lines.length > 0 ? ` · <span style="color:var(--success)">${lines.length} שורות פריטים</span>` : ''}</div>
-            ${warn ? `<div style="color:var(--danger);font-size:0.82rem;margin-bottom:8px">${warn}</div>` : ''}
-            <table class="invoice-table" style="width:100%">
-                <thead><tr><th>חשבון</th><th>תיאור</th><th>חובה</th><th>זכות</th></tr></thead>
+            <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">
+                פקודת יומן · סניף: ${branch || '—'}${lines.length > 0 ? ` · ${lines.length} שורות` : ''}
+                ${warn ? `<span style="color:var(--danger);margin-right:6px">${warn}</span>` : ''}
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:0.76rem">
+                <thead><tr style="background:var(--bg-tertiary)">
+                    <th ${tdS}>חשבון</th><th ${tdS}>תיאור</th><th ${tdS}>חובה</th><th ${tdS}>זכות</th>
+                </tr></thead>
                 <tbody>
                     ${debitRows}
                     ${vatRow}
                     <tr>
-                        <td>${acInput('supplier.priority_supplier_code', supplierAcc)}</td>
-                        <td>${(d.supplier && d.supplier.name) || 'ספק'}</td>
-                        <td></td><td>${amtInput('total_amount', total)}</td></tr>
+                        <td ${tdS}>${acInput('supplier.priority_supplier_code', supplierAcc)}</td>
+                        <td ${tdS}>${(d.supplier && d.supplier.name) || 'ספק'}</td>
+                        <td ${tdS}></td><td ${tdS}>${amtInput('total_amount', total)}</td></tr>
                     <tr style="font-weight:700;border-top:2px solid var(--border)">
-                        <td colspan="2">סה"כ</td>
-                        <td>₪${money(dr)}</td><td>₪${money(cr)}</td></tr>
+                        <td ${tdS} colspan="2">סה"כ</td>
+                        <td ${tdS}>₪${money(dr)}</td><td ${tdS}>₪${money(cr)}</td></tr>
                 </tbody>
             </table>
-            <div style="font-size:0.8rem;margin-top:6px;color:${balanced ? 'var(--success)' : 'var(--danger)'}">
-                ${balanced ? '✓ התנועה מאוזנת' : '⚠ התנועה אינה מאוזנת — בדוק את הסכומים'}</div>`;
+            <div style="font-size:0.72rem;margin-top:3px;color:${balanced ? 'var(--success)' : 'var(--danger)'}">
+                ${balanced ? '✓ מאוזן' : '⚠ לא מאוזן'}</div>`;
 
         box.querySelectorAll('.edit-field').forEach(input => {
             input.addEventListener('change', () => this.saveFieldEdit(input));
