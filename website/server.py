@@ -163,6 +163,23 @@ async def debug_node():
     return result
 
 
+@app.get("/api/debug/recent")
+async def debug_recent():
+    """מחזיר סטטוס חשבוניות אחרונות — ללא נתונים רגישים."""
+    invs = sorted(store.get_all(), key=lambda i: i.updated_at or "", reverse=True)[:10]
+    return [
+        {
+            "id": i.id[:8],
+            "status": i.status.value,
+            "priority_invoice_id": i.priority_invoice_id,
+            "priority_journal_id": i.priority_journal_id,
+            "error_message": (i.error_message or "")[:200],
+            "updated_at": i.updated_at,
+        }
+        for i in invs
+    ]
+
+
 @app.get("/api/health")
 async def health_check():
     """בדיקת תקינות השרת."""
