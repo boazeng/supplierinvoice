@@ -46,6 +46,22 @@ const L = {
 
     openNewCompany() { el('nc-name').value = ''; el('nc-tax').value = ''; el('dlg-company').showModal(); },
 
+    async importFromPriority() {
+        const btn = el('btn-import-priority');
+        btn.disabled = true;
+        btn.textContent = 'מייבא...';
+        try {
+            const r = await api('/api/ledger/import-companies', { method: 'POST' });
+            toast(`יובאו ${r.imported} חברות מ-Priority${r.skipped ? ` (${r.skipped} קיימות)` : ''}`);
+            await L.loadCompanies();
+        } catch (e) {
+            toast('שגיאה בייבוא: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '↓ ייבא מ-Priority';
+        }
+    },
+
     async createCompany() {
         const name = el('nc-name').value.trim();
         if (!name) { toast('הזן שם חברה'); return; }

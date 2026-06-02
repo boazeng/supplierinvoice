@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from config.settings import DATA_DIR
 from database import ledger_db
+from database import db as companies_db
 from agents.date_detector import detect_document_date
 
 logger = logging.getLogger("אתר.ספרים")
@@ -49,6 +50,23 @@ def register_ledger_routes(app, templates_dir: Path) -> None:
             raise HTTPException(400, "חסר שם חברה")
         cid = ledger_db.create_company(name, body.get("tax_id", ""))
         return {"id": cid, "name": name}
+
+    @app.post("/api/ledger/import-companies")
+    async def import_companies_from_priority():
+        """ייבוא כל תתי-החברות מ-Priority כחברות ב-ledger."""
+        branches = companies_db.get_all_branches()
+        imported, skipped = 0, 0
+        for b in branches:
+            name = (b.get("name") or "").strip()
+            if not name:
+                continue
+            existing = ledger_db.list_companies()
+            if any(c["name"] == name for c in existing):
+                skipped += 1
+                continue
+            ledger_db.create_company(name, b.get("tax_id") or "")
+            imported += 1
+        return {"imported": imported, "skipped": skipped, "total": len(branches)}
 
     # ---------- ספרים ----------
     @app.get("/api/ledger/companies/{company_id}/books")

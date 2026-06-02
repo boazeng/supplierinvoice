@@ -6,7 +6,7 @@
     <title>קליטת חשבוניות ספק</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/main.css?v=tact4">
+    <link rel="stylesheet" href="/static/css/main.css?v=tact6">
     <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
 </head>
 <body>
@@ -164,26 +164,28 @@
                     </div>
                     <!-- Right: Extracted Data -->
                     <div class="data-pane">
-                        <h3 style="margin:0 0 8px">נתונים שחולצו</h3>
-                        <div id="extracted-data"></div>
+                        <div class="data-pane-scroll">
+                            <h3 style="margin:0 0 8px">נתונים שחולצו</h3>
+                            <div id="extracted-data"></div>
 
-                        <!-- Validation Warnings -->
-                        <div id="validation-warnings" class="warnings-box" style="display:none;">
-                            <h4>אזהרות</h4>
-                            <ul id="warnings-list"></ul>
+                            <!-- Validation Warnings -->
+                            <div id="validation-warnings" class="warnings-box" style="display:none;">
+                                <h4>אזהרות</h4>
+                                <ul id="warnings-list"></ul>
+                            </div>
+
+                            <!-- User Notes -->
+                            <div class="notes-section">
+                                <label for="user-notes">הערות:</label>
+                                <textarea id="user-notes" rows="2" placeholder="הוסף הערות..."></textarea>
+                            </div>
+
+                            <!-- Status Badge (for non-review invoices) -->
+                            <div id="status-display" class="status-display" style="display:none;"></div>
                         </div>
 
-                        <!-- User Notes -->
-                        <div class="notes-section">
-                            <label for="user-notes">הערות:</label>
-                            <textarea id="user-notes" rows="3" placeholder="הוסף הערות..."></textarea>
-                        </div>
-
-                        <!-- Status Badge (for non-review invoices) -->
-                        <div id="status-display" class="status-display" style="display:none;"></div>
-
-                        <!-- Transaction Preview — bottom -->
-                        <div id="transaction-preview" style="margin:10px 0 0;padding:12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:visible"></div>
+                        <!-- Transaction Preview — pinned to bottom, always visible -->
+                        <div id="transaction-preview" style="padding:10px 12px;background:var(--bg-secondary);border-top:1px solid var(--border);flex-shrink:0;overflow:visible"></div>
                     </div>
                 </div>
             </div>
