@@ -110,6 +110,35 @@ async def github_deploy(request: Request):
     return {"ok": True}
 
 
+@app.get("/api/debug/finalize/{ivnum}")
+async def debug_finalize(ivnum: str):
+    """מריץ את finalize_invoice.js עם IVNUM נתון ומחזיר stdout+stderr מלאים."""
+    import asyncio, shutil
+    for cmd in ["node", "nodejs"]:
+        if shutil.which(cmd):
+            node_cmd = cmd
+            break
+    else:
+        return {"error": "node not found"}
+    js_script = BASE_DIR / "priority" / "finalize_invoice.js"
+    if not js_script.exists():
+        return {"error": "finalize_invoice.js not found"}
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            node_cmd, str(js_script), ivnum,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            cwd=str(BASE_DIR / "priority"),
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+        return {
+            "stdout": stdout.decode(errors="replace"),
+            "stderr": stderr.decode(errors="replace"),
+            "returncode": proc.returncode,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/api/debug/node")
 async def debug_node():
     """אבחון זמינות Node.js על השרת — ללא אימות."""
