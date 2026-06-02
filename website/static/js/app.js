@@ -357,9 +357,9 @@ const app = {
         };
 
         actionBtns.style.display = 'flex';
-        showBtn('btn-approve-intake', s === 'pending_approval');
-        showBtn('btn-extract', s === 'pending_extraction');
-        showBtn('btn-submit', s === 'pending_submission');
+        showBtn('btn-approve-intake', false);
+        showBtn('btn-extract', false);
+        showBtn('btn-submit', s === 'pending_submission' || s === 'pending_extraction');
         showBtn('btn-file', s === 'pending_filing');
         showBtn('btn-restore', s === 'on_hold' || s === 'cancelled');
         showBtn('btn-hold', s !== 'on_hold' && s !== 'cancelled');

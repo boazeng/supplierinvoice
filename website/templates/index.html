@@ -61,9 +61,6 @@
         <!-- Status Filter Tabs -->
         <section class="filter-tabs">
             <button class="tab active" data-status="" data-label="הכל" onclick="app.filterByStatus(this, '', '')">הכל</button>
-            <button class="tab" data-status="pending_approval" data-source="upload" data-label="לאישור" onclick="app.filterByStatus(this, 'pending_approval', 'upload')">לאישור</button>
-            <button class="tab" data-status="pending_approval" data-source="email" data-label="מייל לאישור" onclick="app.filterByStatus(this, 'pending_approval', 'email')">מייל לאישור</button>
-            <button class="tab" data-status="pending_extraction" data-label="פענוח" onclick="app.filterByStatus(this, 'pending_extraction', '')">פענוח</button>
             <button class="tab" data-status="pending_submission" data-label="קליטה" onclick="app.filterByStatus(this, 'pending_submission', '')">קליטה</button>
             <button class="tab" data-status="pending_filing" data-label="תיוק" onclick="app.filterByStatus(this, 'pending_filing', '')">תיוק</button>
             <button class="tab" data-status="on_hold" data-label="המתנה" onclick="app.filterByStatus(this, 'on_hold', '')">המתנה</button>
@@ -104,7 +101,7 @@
                                     onclick="app.changeStatus('pending_extraction','אושר לפענוח')">אשר</button>
                             <button id="btn-extract" class="btn btn-primary btn-sm" style="display:none"
                                     onclick="app.extractInvoice()">פענח</button>
-<button id="btn-submit" class="btn btn-success btn-sm" style="display:none"
+                            <button id="btn-submit" class="btn btn-success btn-sm" style="display:none"
                                     onclick="app.approveInvoice()">אשר וקלוט בפריורטי</button>
                             <button id="btn-file" class="btn btn-success btn-sm" style="display:none"
                                     onclick="app.fileToLedger()">תייק בספרי הנהלת חשבונות</button>
@@ -188,7 +185,7 @@
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/js/app.js?v=tx16"></script>
+    <script src="/static/js/app.js?v=tx17"></script>
     <script src="/static/js/tact-header.js"></script>
 </body>
 </html>

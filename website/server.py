@@ -19,7 +19,7 @@ from website.ledger_routes import register_ledger_routes
 from agents.models import Invoice, InvoiceSource, InvoiceStatus
 from agents.orchestrator import Orchestrator
 from priority.priority_client import PriorityClient
-from priority.invoice_submitter import submit_approved_invoice
+from priority.invoice_submitter import submit_approved_invoice, finalize_invoice_background
 from priority.sync_agent import sync_from_priority, get_sync_status
 from tools.invoice_store import InvoiceStore
 from config.settings import INVOICES_DIR, BASE_DIR, DATA_DIR
@@ -296,20 +296,21 @@ async def upload_invoice(file: UploadFile = File(...)):
 
     logger.info("קובץ הועלה: %s → %s", file.filename, save_path)
 
-    # יצירת רשומת חשבונית — העלאה ידנית גם ממתינה לאישור (מקור = upload)
+    # יצירת רשומת חשבונית — פענוח אוטומטי מיד עם ההעלאה
     invoice = Invoice(
         id=file_id,
         source=InvoiceSource.UPLOAD,
         file_path=str(save_path),
         file_type="pdf" if ext == ".pdf" else "image",
-        status=InvoiceStatus.PENDING_APPROVAL,
+        status=InvoiceStatus.PENDING_EXTRACTION,
     )
     store.save(invoice)
+    orchestrator.start_background_processing(file_id)
 
     return {
         "id": invoice.id,
         "status": invoice.status.value,
-        "message": "החשבונית הועלתה — ממתינה לאישור",
+        "message": "החשבונית הועלתה — פענוח מתחיל אוטומטית",
     }
 
 
@@ -687,7 +688,8 @@ async def file_invoice_to_ledger(invoice_id: str):
 
 @app.post("/api/invoices/{invoice_id}/approve")
 async def approve_invoice(invoice_id: str, body: dict = {}):
-    """אישור קליטה בפריורטי."""
+    """אישור קליטה בפריורטי — שלב 1 (OData POST) מיידי, שלב 2 (CLOSEPRINTPIV) ברקע."""
+    import asyncio as _asyncio
     invoice = store.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
@@ -695,17 +697,35 @@ async def approve_invoice(invoice_id: str, body: dict = {}):
     if invoice.status != InvoiceStatus.PENDING_SUBMISSION:
         raise HTTPException(status_code=400, detail=f"לא ניתן לקלוט חשבונית בסטטוס {invoice.status.value}")
 
-    # עדכון הערות משתמש
     invoice.user_notes = body.get("notes", "")
 
-    # קליטה בפריורטי
+    # שלב 1: קליטה ב-OData (מהירה — שניות בודדות)
     invoice = await submit_approved_invoice(invoice, priority_client, store)
+
+    # אם כבר PENDING_FILING — הכל הסתיים (לא צריך ברקע)
+    if invoice.status == InvoiceStatus.PENDING_FILING:
+        return {
+            "id": invoice.id,
+            "status": invoice.status.value,
+            "priority_invoice_id": invoice.priority_invoice_id,
+            "message": "החשבונית נקלטה בפריורטי בהצלחה!",
+        }
+
+    # אם יש T-number — CLOSEPRINTPIV עדיין רץ ברקע (asyncio.create_task)
+    # מחזירים תשובה מיידית; הפולינג יעדכן את הסטטוס
+    if invoice.priority_invoice_id:
+        return {
+            "id": invoice.id,
+            "status": "pending_filing",  # אופטימיסטי — יתעדכן ברקע
+            "priority_invoice_id": invoice.priority_invoice_id,
+            "message": "החשבונית קלוטה ומסגרת ברקע — יתעדכן אוטומטית",
+        }
 
     return {
         "id": invoice.id,
         "status": invoice.status.value,
         "priority_invoice_id": invoice.priority_invoice_id,
-        "message": "החשבונית נקלטה בפריורטי" if invoice.status == InvoiceStatus.PENDING_FILING else invoice.error_message,
+        "message": invoice.error_message or "שגיאה בקליטה",
     }
 
 
