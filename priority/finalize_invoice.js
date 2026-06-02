@@ -1,6 +1,6 @@
 'use strict';
 /**
- * מצרף קובץ ומבצע CLOSEPRINTPIV על חשבונית בפריורטי דרך WCF Web SDK.
+ * מצרף קובץ ומבצע CLOSEPIV/CLOSEPRINTPIV על חשבונית בפריורטי דרך WCF Web SDK.
  *
  * Usage:
  *   node finalize_invoice.js <IVNUM> <filePath>
@@ -32,22 +32,96 @@ function withTimeout(promise, ms, label) {
   return Promise.race([promise, t]);
 }
 
-/**
- * בונה onShowMessage handler שמאשר אוטומטית כל הודעה מפריורטי.
- * CLOSEPRINTPIV עשוי להציג דיאלוג אישור — בלי handler זה הפעולה תיתקע.
- */
 function makeMessageHandler(label) {
   return function onShowMessage(msg) {
     process.stderr.write(`[${label}] Priority message: code=${msg.code} type=${msg.type} msg=${msg.message}\n`);
     if (msg.form) {
-      try {
-        // warningConfirm(1) = OK/Yes לכל סוגי ההודעות
-        msg.form.warningConfirm(1);
-      } catch (e) {
+      try { msg.form.warningConfirm(1); } catch (e) {
         try { msg.form.infoMsgConfirm(); } catch (_) {}
       }
     }
   };
+}
+
+/**
+ * מטפל במהלך ריצת פרוצדורה (ProcData) — מאשר הודעות ומסיים
+ * מחזיר { ok: true } כאשר הפרוצדורה הסתיימה, או { ok: false, error } בשגיאה
+ */
+async function runProcedure(procData, label) {
+  let step = procData;
+  let iter = 0;
+  while (step && iter++ < 20) {
+    process.stderr.write(`[${label}] proc step type=${step.type} messagetype=${step.messagetype || ''} message=${step.message || ''}\n`);
+    const proc = step.proc;
+
+    if (step.type === 'end') {
+      return { ok: true };
+    }
+
+    if (step.type === 'message') {
+      if (step.messagetype === 'error') {
+        return { ok: false, error: step.message || 'Procedure error' };
+      }
+      // warning / information — אשר אוטומטית
+      if (!proc) return { ok: false, error: 'No proc object on message step' };
+      step = await withTimeout(
+        new Promise((res, rej) => proc.message(1, res, rej)),
+        30000, `${label} message`
+      ).catch(e => ({ type: 'error_caught', error: e.message }));
+      if (step && step.type === 'error_caught') return { ok: false, error: step.error };
+      continue;
+    }
+
+    if (step.type === 'inputFields') {
+      if (!proc) return { ok: false, error: 'No proc on inputFields' };
+      step = await withTimeout(
+        new Promise((res, rej) => proc.inputFields(1, { EditFields: [] }, res, rej)),
+        30000, `${label} inputFields`
+      ).catch(e => ({ type: 'error_caught', error: e.message }));
+      if (step && step.type === 'error_caught') return { ok: false, error: step.error };
+      continue;
+    }
+
+    if (step.type === 'inputOptions') {
+      if (!proc) return { ok: false, error: 'No proc on inputOptions' };
+      const sel = (step.input && step.input.Options && step.input.Options[0]) ? step.input.Options[0].field : 1;
+      step = await withTimeout(
+        new Promise((res, rej) => proc.inputOptions(1, sel, res, rej)),
+        30000, `${label} inputOptions`
+      ).catch(e => ({ type: 'error_caught', error: e.message }));
+      if (step && step.type === 'error_caught') return { ok: false, error: step.error };
+      continue;
+    }
+
+    if (step.type === 'reportOptions' || step.type === 'documentOptions') {
+      if (!proc) return { ok: false, error: 'No proc on options' };
+      const fmt = (step.formats && step.formats[0]) ? step.formats[0].format : 1;
+      const fn = step.type === 'reportOptions' ? 'reportOptions' : 'documentOptions';
+      step = await withTimeout(
+        new Promise((res, rej) => proc[fn](1, fmt, 1, res, rej)),
+        30000, `${label} ${fn}`
+      ).catch(e => ({ type: 'error_caught', error: e.message }));
+      if (step && step.type === 'error_caught') return { ok: false, error: step.error };
+      continue;
+    }
+
+    if (step.type === 'displayUrl') {
+      // דוח/מסמך — נגמר
+      return { ok: true };
+    }
+
+    // שלב לא מוכר — נסה להמשיך
+    if (proc && proc.continueProc) {
+      step = await withTimeout(
+        new Promise((res, rej) => proc.continueProc(res, rej)),
+        30000, `${label} continueProc`
+      ).catch(e => ({ type: 'error_caught', error: e.message }));
+      if (step && step.type === 'error_caught') return { ok: false, error: step.error };
+    } else {
+      return { ok: false, error: `Unknown proc step type: ${step.type}` };
+    }
+  }
+  return { ok: false, error: 'Procedure loop exceeded limit' };
 }
 
 async function main() {
@@ -72,13 +146,16 @@ async function main() {
   const form = await withTimeout(
     new Promise((res, rej) => priority.formStartEx(
       'PINVOICES',
-      makeMessageHandler('PINVOICES'),  // onShowMessage — מאשר הודעות אוטומטית
+      makeMessageHandler('PINVOICES'),
       null,
       company, 1, { zoomValue: ivnum }, res, rej
     )),
     30000, 'formStartEx'
   );
   process.stderr.write('Form opened\n');
+
+  // הדפס מידע על הטופס — subforms וכו'
+  process.stderr.write(`Form subForms: ${JSON.stringify(Object.keys(form.subForms || {}))}\n`);
 
   const rows = await withTimeout(
     new Promise((res, rej) => form.getRows(1, res, rej)),
@@ -92,9 +169,8 @@ async function main() {
     const sub = await withTimeout(
       new Promise((res, rej) => form.startSubForm(
         'EXTFILES',
-        makeMessageHandler('EXTFILES'),  // onShowMessage לתת-טופס
-        null,
-        res, rej
+        makeMessageHandler('EXTFILES'),
+        null, res, rej
       )),
       20000, 'startSubForm EXTFILES'
     );
@@ -112,48 +188,97 @@ async function main() {
     process.stderr.write('File attached\n');
   }
 
-  // ניסיון לסגור — בודק רשימת שמות פרוצדורות אפשריים
+  // ניסיון לסגור — activateStart עם type='P', ואחר כך procStart
   const procNames = [
-    'CLOSEPIV', 'CLOSEPRINTPIV', 'PRICLOSEPIV', 'CONFIRM',
-    'APPROVE', 'FINALIZE', 'CLOSE', 'INVCLOSE', 'DOCCLOSE'
+    'CLOSEPIV', 'CLOSEPRINTPIV', 'PRICLOSEPIV',
+    'CPIV', 'CONFIRMIV', 'PCLOSEPIV', 'PCLOSINV',
+    'FCLOSEPIV', 'ACLOSEPIV', 'SUPINVCLS', 'PIVCLS',
   ];
   let closeResult = null;
   let usedProc = '';
+  let usedMethod = '';
+
+  // שיטה 1: form.activateStart עם type='P'
   for (const proc of procNames) {
-    process.stderr.write(`Trying ${proc}...\n`);
-    closeResult = await withTimeout(
-      new Promise((res, rej) => form.activateStart(proc, null, null, res, rej)),
+    process.stderr.write(`Trying activateStart('${proc}', 'P')...\n`);
+    const firstStep = await withTimeout(
+      new Promise((res, rej) => form.activateStart(proc, 'P', null, res, rej)),
       30000, `activateStart ${proc}`
-    ).catch(e => ({ messagetype: 'error', message: e.message }));
-    process.stderr.write(`${proc} result: ${JSON.stringify(closeResult)}\n`);
-    const isNotFound = closeResult && closeResult.messagetype === 'error' &&
-        closeResult.message && (
-          closeResult.message.includes('No such') ||
-          closeResult.message.includes('not found') ||
-          closeResult.message.includes('timed out')
-        );
+    ).catch(e => ({ type: 'error_caught', error: e.message, messagetype: 'error', message: e.message }));
+
+    process.stderr.write(`${proc} firstStep: ${JSON.stringify(firstStep)}\n`);
+
+    const isNotFound = (firstStep.type === 'message' && firstStep.messagetype === 'error' &&
+        firstStep.message && firstStep.message.includes('No such')) ||
+      (firstStep.type === 'error_caught' && firstStep.error && firstStep.error.includes('No such'));
     if (isNotFound) continue;
-    usedProc = proc;
-    break;
+
+    if (firstStep.type === 'end') {
+      usedProc = proc; usedMethod = 'activateStart'; break;
+    }
+
+    closeResult = await runProcedure(firstStep, proc);
+    process.stderr.write(`${proc} runProcedure result: ${JSON.stringify(closeResult)}\n`);
+    if (closeResult && closeResult.ok) {
+      usedProc = proc; usedMethod = 'activateStart'; break;
+    }
+    // אם לא "not found" — עצור (הפרוצדורה נמצאה אבל נכשלה)
+    if (closeResult && !closeResult.error?.includes('No such')) {
+      usedProc = proc; usedMethod = 'activateStart(failed)'; break;
+    }
   }
-  process.stderr.write(`Used procedure: ${usedProc || 'NONE — all failed'}\n`);
+
+  // שיטה 2: procStart (top-level, standalone)
+  if (!usedProc) {
+    for (const proc of procNames) {
+      process.stderr.write(`Trying procStart('${proc}', 'P')...\n`);
+      const firstStep = await withTimeout(
+        new Promise((res, rej) => priority.procStart(proc, 'P', null, company, res, rej)),
+        30000, `procStart ${proc}`
+      ).catch(e => ({ type: 'error_caught', error: e.message, messagetype: 'error', message: e.message }));
+
+      process.stderr.write(`procStart ${proc} firstStep: ${JSON.stringify(firstStep)}\n`);
+
+      const isNotFound = (firstStep.type === 'message' && firstStep.messagetype === 'error' &&
+          firstStep.message && firstStep.message.includes('No such')) ||
+        (firstStep.type === 'error_caught' && firstStep.error && firstStep.error.includes('No such'));
+      if (isNotFound) continue;
+
+      if (firstStep.type === 'end') {
+        usedProc = proc; usedMethod = 'procStart'; break;
+      }
+
+      closeResult = await runProcedure(firstStep, `procStart_${proc}`);
+      process.stderr.write(`procStart ${proc} runProcedure result: ${JSON.stringify(closeResult)}\n`);
+      if (closeResult && closeResult.ok) {
+        usedProc = proc; usedMethod = 'procStart'; break;
+      }
+      if (closeResult && !closeResult.error?.includes('No such')) {
+        usedProc = proc; usedMethod = 'procStart(failed)'; break;
+      }
+    }
+  }
+
+  process.stderr.write(`Used procedure: ${usedProc || 'NONE'} via ${usedMethod || 'N/A'}\n`);
 
   // קריאת IVNUM ו-FNCNUM אחרי הסגירה
+  await withTimeout(new Promise((res, rej) => form.activateEnd(res, rej)), 10000, 'activateEnd').catch(() => {});
   const rowsAfter = await withTimeout(
     new Promise((res, rej) => form.getRows(1, res, rej)),
     15000, 'getRows after close'
   );
   process.stderr.write(`Rows after: ${JSON.stringify(rowsAfter)}\n`);
 
-  const rows2 = rowsAfter && rowsAfter.PINVOICES ? rowsAfter.PINVOICES : {};
+  const rows2 = (rowsAfter && rowsAfter.PINVOICES) ? rowsAfter.PINVOICES : {};
   const row    = rows2['1'] || rows2[Object.keys(rows2)[0]] || {};
   const fncnum = row.FNCNUM || '';
   const ivnumFinal = row.IVNUM || '';
 
-  await withTimeout(new Promise((res, rej) => form.endCurrentForm(false, res, rej)), 15000, 'endForm');
+  await withTimeout(new Promise((res, rej) => form.endCurrentForm(false, res, rej)), 15000, 'endForm').catch(() => {});
 
-  if (!usedProc) {
-    console.log(JSON.stringify({ ok: false, error: 'No close procedure found among: ' + procNames.join(', ') }));
+  if (!usedProc || (closeResult && !closeResult.ok)) {
+    const errMsg = (closeResult && closeResult.error) || 'No close procedure found among: ' + procNames.join(', ');
+    console.log(JSON.stringify({ ok: false, error: errMsg }));
     return;
   }
   console.log(JSON.stringify({ ok: true, fncnum, ivnum: ivnumFinal }));
