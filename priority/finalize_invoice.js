@@ -68,9 +68,22 @@ async function runProcedure(firstStep, label, ivnumVal) {
     const mtype = step.messagetype || '';
     process.stderr.write(`[${label}] step=${t} messagetype=${mtype} message=${msg.substring(0,80)}\n`);
 
-    if (t === 'end' || t === 'client' || t === 'displayUrl') {
-      // client = שלב הדפסה בדפדפן — החשבונית כבר נסגרה בשרת, מחשיבים כהצלחה
+    if (t === 'end') {
       return { ok: true };
+    }
+
+    if (t === 'client' || t === 'displayUrl') {
+      // קריאה ל-clientContinue מאשרת לשרת שהלקוח טיפל בשלב ההדפסה — Priority ממשיך לסגור
+      if (!proc || !proc.clientContinue) {
+        process.stderr.write(`[${label}] client step but no clientContinue — treating as done\n`);
+        return { ok: true };
+      }
+      process.stderr.write(`[${label}] calling clientContinue with data=${JSON.stringify(step.data)}\n`);
+      step = await withTimeout(
+        new Promise((res, rej) => proc.clientContinue(step.data || {}, res, rej)),
+        30000, `${label}.clientContinue`
+      ).catch(e => ({ type: 'error_caught', error: e.message }));
+      continue;
     }
 
     if (t === 'error_caught') return { ok: false, error: step.error || msg };
@@ -246,10 +259,10 @@ async function main() {
   // ===== סגירת החשבונית =====
   // CLOSEPRINTPIV עם activateStart('CLOSEPRINTPIV', 'P') — מחזיר 'client' כשהסגירה הצליחה בשרת
   const procAttempts = [
-    { method: 'activateStart', proc: 'CLOSEPIV',      type: 'P' },
     { method: 'activateStart', proc: 'CLOSEPRINTPIV', type: 'P' },
-    { method: 'procStart',     proc: 'CLOSEPIV',      type: 'P' },
+    { method: 'activateStart', proc: 'CLOSEPIV',      type: 'P' },
     { method: 'procStart',     proc: 'CLOSEPRINTPIV', type: 'P' },
+    { method: 'procStart',     proc: 'CLOSEPIV',      type: 'P' },
   ];
 
   let procSucceeded = false;
@@ -273,7 +286,7 @@ async function main() {
       process.stderr.write(`${method} ${proc}: client step data=${JSON.stringify({url: firstStep.url, message: firstStep.message, displayUrl: firstStep.displayUrl, proc: !!firstStep.proc})}\n`);
     }
 
-    if (isNotFoundError(firstStep) || isClientOnly(firstStep)) continue; // לא קיים / דפדפן בלבד — נסה הבא
+    if (isNotFoundError(firstStep)) continue; // לא קיים — נסה הבא
 
     const result = await runProcedure(firstStep, `${method}_${proc}`, ivnum);
     process.stderr.write(`${method} ${proc}: result=${JSON.stringify(result)}\n`);
