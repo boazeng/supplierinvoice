@@ -269,6 +269,9 @@ async function main() {
       ).catch(e => ({ type: 'error_caught', error: e.message }));
     }
     process.stderr.write(`${method} ${proc}: firstStep.type=${firstStep.type}\n`);
+    if (firstStep.type === 'client' || firstStep.type === 'displayUrl') {
+      process.stderr.write(`${method} ${proc}: client step data=${JSON.stringify({url: firstStep.url, message: firstStep.message, displayUrl: firstStep.displayUrl, proc: !!firstStep.proc})}\n`);
+    }
 
     if (isNotFoundError(firstStep) || isClientOnly(firstStep)) continue; // לא קיים / דפדפן בלבד — נסה הבא
 

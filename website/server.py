@@ -142,16 +142,24 @@ async def debug_finalize(ivnum: str):
 @app.get("/api/debug/close_odata/{ivnum}")
 async def debug_close_odata(ivnum: str):
     """נסה לסגור חשבונית דרך OData bound action — ללא WCF."""
-    result = await priority_client._post(
-        f"PINVOICES(IVNUM='{ivnum}',IVTYPE='P',DEBIT='D')/CLOSEPIV",
-        {},
-    )
-    # גם שליפת IVNUM/FNCNUM אחרי הניסיון
+    import httpx as _httpx
+    post_result = None
+    post_error = None
+    try:
+        post_result = await priority_client._post(
+            f"PINVOICES(IVNUM='{ivnum}',IVTYPE='P',DEBIT='D')/CLOSEPIV",
+            {},
+        )
+    except _httpx.HTTPStatusError as e:
+        post_error = {"status": e.response.status_code, "body": e.response.text[:500]}
+    except Exception as e:
+        post_error = {"error": str(e)}
+
     after = await priority_client._get(
         "PINVOICES",
         params={"$filter": f"IVNUM eq '{ivnum}'", "$select": "IVNUM,FNCNUM", "$top": "1"},
     )
-    return {"post_result": result, "after": after}
+    return {"post_result": post_result, "post_error": post_error, "after": after}
 
 
 @app.get("/api/debug/node")
