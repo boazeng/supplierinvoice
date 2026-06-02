@@ -129,7 +129,7 @@ async def debug_finalize(ivnum: str):
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             cwd=str(BASE_DIR / "priority"),
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=240)
         return {
             "stdout": stdout.decode(errors="replace"),
             "stderr": stderr.decode(errors="replace"),

@@ -81,7 +81,7 @@ async function runProcedure(firstStep, label, ivnumVal) {
       process.stderr.write(`[${label}] calling clientContinue with data=${JSON.stringify(step.data)}\n`);
       step = await withTimeout(
         new Promise((res, rej) => proc.clientContinue(step.data || {}, res, rej)),
-        30000, `${label}.clientContinue`
+        90000, `${label}.clientContinue`
       ).catch(e => ({ type: 'error_caught', error: e.message }));
       continue;
     }
