@@ -112,13 +112,27 @@ async function main() {
     process.stderr.write('File attached\n');
   }
 
-  // CLOSEPRINTPIV — אישור וסגירה
-  process.stderr.write('Calling CLOSEPRINTPIV...\n');
-  const closeResult = await withTimeout(
-    new Promise((res, rej) => form.activateStart('CLOSEPRINTPIV', null, null, res, rej)),
-    60000, 'activateStart CLOSEPRINTPIV'
-  );
-  process.stderr.write(`CLOSEPRINTPIV result: ${JSON.stringify(closeResult)}\n`);
+  // ניסיון לסגור עם CLOSEPIV (ואם לא קיים — CLOSEPRINTPIV)
+  const procNames = ['CLOSEPIV', 'CLOSEPRINTPIV'];
+  let closeResult = null;
+  let usedProc = '';
+  for (const proc of procNames) {
+    process.stderr.write(`Calling ${proc}...\n`);
+    closeResult = await withTimeout(
+      new Promise((res, rej) => form.activateStart(proc, null, null, res, rej)),
+      60000, `activateStart ${proc}`
+    );
+    process.stderr.write(`${proc} result: ${JSON.stringify(closeResult)}\n`);
+    // אם השגיאה היא "No such Tabula Entity" — נסה את הבא
+    if (closeResult && closeResult.messagetype === 'error' &&
+        closeResult.message && closeResult.message.includes('No such')) {
+      process.stderr.write(`${proc} not found, trying next...\n`);
+      continue;
+    }
+    usedProc = proc;
+    break;
+  }
+  process.stderr.write(`Used procedure: ${usedProc || 'none'}\n`);
 
   // קריאת IVNUM ו-FNCNUM אחרי הסגירה
   const rowsAfter = await withTimeout(
@@ -127,7 +141,8 @@ async function main() {
   );
   process.stderr.write(`Rows after: ${JSON.stringify(rowsAfter)}\n`);
 
-  const row    = rowsAfter && rowsAfter.PINVOICES && rowsAfter.PINVOICES[0] ? rowsAfter.PINVOICES[0] : {};
+  const rows2 = rowsAfter && rowsAfter.PINVOICES ? rowsAfter.PINVOICES : {};
+  const row    = rows2['1'] || rows2[Object.keys(rows2)[0]] || {};
   const fncnum = row.FNCNUM || '';
   const ivnumFinal = row.IVNUM || '';
 
