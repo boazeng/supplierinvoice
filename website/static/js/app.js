@@ -919,27 +919,40 @@ const app = {
     async approveInvoice() {
         if (!this.currentInvoice) return;
         const notes = document.getElementById('user-notes').value;
+        const btn = document.getElementById('btn-submit');
+
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '⏳ שולח לפריורטי...';
+        }
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min
             const res = await fetch(`/api/invoices/${this.currentInvoice.id}/approve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ notes }),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
             const data = await res.json();
             if (!res.ok) {
                 this.showToast(data.detail || data.message || 'שגיאה באישור', 'error');
+                if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
                 return;
             }
             if (data.status === 'pending_filing') {
                 this.showToast('החשבונית נקלטה בפריורטי בהצלחה!', 'success');
             } else {
                 this.showToast(data.message || 'שגיאה בקליטה בפריורטי', 'error');
+                if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
             }
             this.closeModal();
             this.loadInvoices();
         } catch (err) {
             this.showToast('שגיאת תקשורת', 'error');
+            if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
         }
     },
 
