@@ -77,9 +77,10 @@ async def _finalize_in_priority(
             invoice.error_message        = ""
             logger.info("CLOSEPRINTPIV הצליח — IVNUM: %s, FNCNUM: %s", final_ivnum, fncnum)
         else:
+            err_detail = result.get("error", "") or result.get("stderr", "")
             invoice.status        = InvoiceStatus.PENDING_SUBMISSION
-            invoice.error_message = "CLOSEPRINTPIV לא הצליח — החשבונית ממתינה לאישור ידני בפריורטי"
-            logger.warning("CLOSEPRINTPIV לא הפיק IVNUM סופי עבור %s", ivnum)
+            invoice.error_message = f"CLOSEPRINTPIV נכשל: {err_detail}" if err_detail else "CLOSEPRINTPIV לא הצליח — בדוק יומן שרת"
+            logger.warning("CLOSEPRINTPIV לא הפיק IVNUM סופי עבור %s — %s", ivnum, err_detail)
     else:
         # חשבונית כבר קיימת עם IVNUM סופי — קרא FNCNUM וסמן כמוכן לתיוק
         result = await priority_client._get(

@@ -210,17 +210,19 @@ class PriorityClient:
                 logger.warning("finalize_invoice לא החזיר פלט")
                 return {}
             result = _json.loads(raw)
+            stderr_text = stderr.decode(errors="replace")[:800] if stderr else ""
             if result.get("ok"):
                 fncnum = result.get("fncnum", "")
                 ivnum  = result.get("ivnum", "")
                 logger.info("finalize_invoice הצליח — IVNUM: %s, FNCNUM: %s", ivnum, fncnum)
                 return {"ivnum": ivnum, "fncnum": fncnum}
             else:
-                logger.warning("finalize_invoice נכשל: %s", result.get("error"))
-                return {}
+                err = result.get("error", "unknown")
+                logger.warning("finalize_invoice נכשל: %s | stderr: %s", err, stderr_text)
+                return {"error": err, "stderr": stderr_text}
         except Exception as e:
             logger.warning("שגיאה ב-finalize_invoice: %s", e)
-            return {}
+            return {"error": str(e)}
 
     # --- בדיקת חיבור ---
 

@@ -98,12 +98,14 @@ async def github_deploy(request: Request):
     expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, expected):
         raise HTTPException(status_code=403, detail="invalid signature")
+    # הנתיב נגזר מהמיקום האמיתי של הקובץ הנוכחי (עובד עם ec2-user ועם ubuntu)
+    import os as _os
+    repo_dir = str(Path(__file__).resolve().parent.parent)
     subprocess.Popen(["bash", "-c",
-        "sleep 1"
-        " && git -C /home/ubuntu/supplierinvoice pull"
-        " && (command -v node || (curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs))"
-        " && cd /home/ubuntu/supplierinvoice/priority && npm install --production --silent"
-        " && sudo systemctl restart supplierinvoice"
+        f"sleep 1"
+        f" && git -C {repo_dir} pull"
+        f" && cd {repo_dir}/priority && npm install --production --silent"
+        f" && sudo systemctl restart supplierinvoice"
     ])
     return {"ok": True}
 
