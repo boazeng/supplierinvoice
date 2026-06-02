@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends, Request, BackgroundTasks
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -19,7 +19,7 @@ from website.ledger_routes import register_ledger_routes
 from agents.models import Invoice, InvoiceSource, InvoiceStatus
 from agents.orchestrator import Orchestrator
 from priority.priority_client import PriorityClient
-from priority.invoice_submitter import submit_approved_invoice, finalize_invoice_background
+from priority.invoice_submitter import submit_approved_invoice, finalize_invoice_background, submit_invoice_odata_only, _is_temp_ivnum
 from priority.sync_agent import sync_from_priority, get_sync_status
 from tools.invoice_store import InvoiceStore
 from config.settings import INVOICES_DIR, BASE_DIR, DATA_DIR
@@ -687,9 +687,12 @@ async def file_invoice_to_ledger(invoice_id: str):
 
 
 @app.post("/api/invoices/{invoice_id}/approve")
-async def approve_invoice(invoice_id: str, body: dict = {}):
-    """אישור קליטה בפריורטי — שלב 1 (OData POST) מיידי, שלב 2 (CLOSEPRINTPIV) ברקע."""
-    import asyncio as _asyncio
+async def approve_invoice(invoice_id: str, background_tasks: BackgroundTasks, body: dict = {}):
+    """
+    אישור קליטה בפריורטי.
+    שלב 1 (OData POST — שניות): מיידי, מחזיר תשובה ל-client.
+    שלב 2 (CLOSEPRINTPIV — דקות): רץ ברקע אחרי ה-response.
+    """
     invoice = store.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
@@ -699,11 +702,23 @@ async def approve_invoice(invoice_id: str, body: dict = {}):
 
     invoice.user_notes = body.get("notes", "")
 
-    # שלב 1: קליטה ב-OData (מהירה — שניות בודדות)
-    invoice = await submit_approved_invoice(invoice, priority_client, store)
+    # שלב 1: OData POST בלבד — מהיר, לא חוסם
+    invoice = await submit_invoice_odata_only(invoice, priority_client, store)
 
-    # אם כבר PENDING_FILING — הכל הסתיים (לא צריך ברקע)
-    if invoice.status == InvoiceStatus.PENDING_FILING:
+    if not invoice.priority_invoice_id:
+        # כישלון בשלב 1 — אין T-number
+        return {
+            "id": invoice.id,
+            "status": invoice.status.value,
+            "priority_invoice_id": "",
+            "message": invoice.error_message or "שגיאה בקליטה",
+        }
+
+    if not _is_temp_ivnum(invoice.priority_invoice_id):
+        # IVNUM סופי כבר (חשבונית כפולה שכבר הוסבה) — אין צורך בשלב 2
+        invoice.status = InvoiceStatus.PENDING_FILING
+        invoice.updated_at = datetime.now().isoformat()
+        store.save(invoice)
         return {
             "id": invoice.id,
             "status": invoice.status.value,
@@ -711,21 +726,17 @@ async def approve_invoice(invoice_id: str, body: dict = {}):
             "message": "החשבונית נקלטה בפריורטי בהצלחה!",
         }
 
-    # אם יש T-number — CLOSEPRINTPIV עדיין רץ ברקע (asyncio.create_task)
-    # מחזירים תשובה מיידית; הפולינג יעדכן את הסטטוס
-    if invoice.priority_invoice_id:
-        return {
-            "id": invoice.id,
-            "status": "pending_filing",  # אופטימיסטי — יתעדכן ברקע
-            "priority_invoice_id": invoice.priority_invoice_id,
-            "message": "החשבונית קלוטה ומסגרת ברקע — יתעדכן אוטומטית",
-        }
+    # שלב 2: CLOSEPRINTPIV ברקע — לאחר ה-response
+    background_tasks.add_task(
+        finalize_invoice_background, invoice.id, priority_client, store
+    )
+    logger.info("CLOSEPRINTPIV תוזמן ברקע — %s IVNUM: %s", invoice.id[:8], invoice.priority_invoice_id)
 
     return {
         "id": invoice.id,
-        "status": invoice.status.value,
+        "status": "pending_filing",
         "priority_invoice_id": invoice.priority_invoice_id,
-        "message": invoice.error_message or "שגיאה בקליטה",
+        "message": "החשבונית קלוטה — מסגרת ברקע (עד מספר דקות)",
     }
 
 

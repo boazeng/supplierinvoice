@@ -79,25 +79,28 @@ async def _finalize_in_priority(
             logger.info("CLOSEPRINTPIV הצליח — IVNUM: %s, FNCNUM: %s", final_ivnum, fncnum)
         else:
             err_detail = result.get("error", "") or result.get("stderr", "")
-            # T_NOT_FOUND: מספר זמני לא קיים בפריורטי — כנראה כבר הוסב; מחפשים לפי BOOKNUM
-            if err_detail and err_detail.startswith("T_NOT_FOUND:"):
-                logger.info("T-number לא נמצא, מחפש לפי BOOKNUM: %s", invoice.extracted_data.invoice_number if invoice.extracted_data else "?")
-                if invoice.extracted_data and invoice.extracted_data.invoice_number:
-                    sup = invoice.extracted_data.supplier.priority_supplier_code or ""
-                    lookup = await priority_client._get(
-                        "PINVOICES",
-                        params={
-                            "$filter": f"BOOKNUM eq '{invoice.extracted_data.invoice_number}' and SUPNAME eq '{sup}'",
-                            "$select": "IVNUM,FNCNUM",
-                            "$top": "1",
-                        },
-                    )
-                    found = (lookup or {}).get("value", [{}])[0]
+            # בפריורטי, CLOSEPRINTPIV יוצר רשומה חדשה עם IVNUM סופי — ה-T-number הישן נשאר.
+            # לכן תמיד מחפשים לפי BOOKNUM+SUPNAME, ללא קשר לסיבת הכישלון.
+            if invoice.extracted_data and invoice.extracted_data.invoice_number:
+                sup = invoice.extracted_data.supplier.priority_supplier_code or ""
+                booknum = invoice.extracted_data.invoice_number
+                logger.info("מחפש IVNUM סופי לפי BOOKNUM=%s SUPNAME=%s", booknum, sup)
+                lookup = await priority_client._get(
+                    "PINVOICES",
+                    params={
+                        "$filter": f"BOOKNUM eq '{booknum}' and SUPNAME eq '{sup}'",
+                        "$select": "IVNUM,FNCNUM",
+                        "$top": "1",
+                    },
+                )
+                found_list = (lookup or {}).get("value", [])
+                # מחפשים את הרשומה הסופית (לא T-number)
+                for found in found_list:
                     found_ivnum = found.get("IVNUM", "")
                     found_fncnum = found.get("FNCNUM", "")
                     if found_ivnum and not _is_temp_ivnum(found_ivnum):
                         invoice.priority_invoice_id = found_ivnum
-                        invoice.priority_journal_id = str(found_fncnum)
+                        invoice.priority_journal_id = str(found_fncnum or "")
                         invoice.status = InvoiceStatus.PENDING_FILING
                         invoice.error_message = ""
                         logger.info("נמצא IVNUM סופי לפי BOOKNUM: %s, FNCNUM: %s", found_ivnum, found_fncnum)
@@ -119,6 +122,96 @@ async def _finalize_in_priority(
         if fncnum:
             invoice.priority_journal_id = str(fncnum)
         invoice.status = InvoiceStatus.PENDING_FILING
+
+
+async def finalize_invoice_background(
+    invoice_id: str,
+    priority_client: PriorityClient,
+    store: InvoiceStore,
+) -> None:
+    """מריץ CLOSEPRINTPIV ברקע ומעדכן את הסטטוס. קורא לזה כ-BackgroundTask."""
+    invoice = store.get(invoice_id)
+    if not invoice or not invoice.priority_invoice_id:
+        return
+    if not _is_temp_ivnum(invoice.priority_invoice_id):
+        return  # כבר סגור
+    await _finalize_in_priority(invoice, priority_client, True)
+    invoice.updated_at = datetime.now().isoformat()
+    store.save(invoice)
+    logger.info("finalize_background הסתיים — %s → IVNUM: %s", invoice_id[:8], invoice.priority_invoice_id)
+
+
+async def submit_invoice_odata_only(
+    invoice: Invoice,
+    priority_client: PriorityClient,
+    store: InvoiceStore,
+) -> Invoice:
+    """
+    שלב 1 בלבד: שולח ל-OData ומקבל T-number.
+    לא מריץ CLOSEPRINTPIV — הקוראים אחראים לתזמן finalize_invoice_background.
+    """
+    if not invoice.extracted_data:
+        raise ValueError("אין נתונים מנותחים לחשבונית")
+    if not invoice.extracted_data.supplier.priority_supplier_code:
+        raise ValueError("לא נמצא קוד ספק בפריורטי — לא ניתן לקלוט")
+    if not invoice.extracted_data.invoice_number:
+        raise ValueError("מספר חשבונית חסר — יש לערוך ולהזין מספר חשבונית לפני הקליטה")
+
+    logger.info(
+        "שלח OData בלבד — חשבונית %s ספק %s",
+        invoice.id,
+        invoice.extracted_data.supplier.priority_supplier_code,
+    )
+
+    payload = _build_priority_payload(invoice.extracted_data)
+
+    try:
+        result = await priority_client.submit_invoice(payload)
+        invoice.priority_invoice_id = result.get("IVNUM", "")
+        invoice.error_message = ""
+        logger.info("OData קלט חשבונית — IVNUM: %s", invoice.priority_invoice_id)
+    except Exception as e:
+        import httpx as _httpx
+        import json as _json
+        detail = str(e)
+        if isinstance(e, _httpx.HTTPStatusError):
+            raw = e.response.text
+            try:
+                parsed = _json.loads(raw)
+                detail = (
+                    parsed.get("FORM", {}).get("InterfaceErrors", {}).get("text")
+                    or parsed.get("error", {}).get("message")
+                    or raw
+                )
+            except Exception:
+                detail = raw
+
+        is_duplicate = "כבר קיימת" in detail or "already exists" in detail.lower()
+        if is_duplicate:
+            existing = await priority_client._get(
+                "PINVOICES",
+                params={
+                    "$filter": f"BOOKNUM eq '{invoice.extracted_data.invoice_number}' and SUPNAME eq '{invoice.extracted_data.supplier.priority_supplier_code}'",
+                    "$select": "IVNUM,BOOKNUM,SUPNAME",
+                    "$top": "1",
+                },
+            )
+            ivnum = (existing or {}).get("value", [{}])[0].get("IVNUM", "") if existing else ""
+            if ivnum:
+                invoice.priority_invoice_id = ivnum
+                invoice.error_message = ""
+                logger.info("חשבונית כבר קיימת — IVNUM: %s", ivnum)
+            else:
+                invoice.status = InvoiceStatus.PENDING_SUBMISSION
+                invoice.error_message = f"שגיאה בקליטה: {detail}"
+        else:
+            invoice.status = InvoiceStatus.PENDING_SUBMISSION
+            invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
+            logger.error("שגיאה בקליטה: %s", detail)
+
+    invoice.updated_at = datetime.now().isoformat()
+    store.save(invoice)
+    return invoice
 
 
 async def submit_approved_invoice(
