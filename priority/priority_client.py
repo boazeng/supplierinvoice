@@ -208,9 +208,16 @@ class PriorityClient:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=180)
             if stderr:
                 logger.info("finalize_invoice stderr: %s", stderr.decode(errors="replace")[:1000])
-            raw = stdout.decode().strip()
+            # dotenv עלול להדפיס שורות לוג ל-stdout לפני ה-JSON — לוקחים את השורה האחרונה שמתחילה ב-{
+            raw_full = stdout.decode(errors="replace").strip()
+            raw = ""
+            for line in reversed(raw_full.splitlines()):
+                line = line.strip()
+                if line.startswith("{"):
+                    raw = line
+                    break
             if not raw:
-                logger.warning("finalize_invoice לא החזיר פלט")
+                logger.warning("finalize_invoice לא החזיר פלט JSON. stdout: %s", raw_full[:300])
                 return {}
             result = _json.loads(raw)
             stderr_text = stderr.decode(errors="replace")[:800] if stderr else ""
