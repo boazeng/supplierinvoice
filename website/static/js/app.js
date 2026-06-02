@@ -273,7 +273,6 @@ const app = {
             </div>
             <div class="data-row">
                 <div class="data-field"><span class="label">פריורטי</span>${ef('supplier.priority_supplier_code', d.supplier?.priority_supplier_code)}</div>
-                <div class="data-field" style="flex:2"><span class="label">כתובת</span>${ef('supplier.address', d.supplier?.address)}</div>
             </div>
             <div class="data-row">
                 <div class="data-field" style="flex:1"><span class="label">חשבון הוצאות</span>${efAc('expense_account', d.expense_account, '/api/db/accounts/search')}</div>
@@ -288,7 +287,6 @@ const app = {
             <div class="data-row">
                 <div class="data-field"><span class="label">פריורטי</span>${ef('customer.priority_customer_code', d.customer?.priority_customer_code)}</div>
                 <div class="data-field"><span class="label">סניף</span>${efAc('customer.branch', d.customer?.branch, '/api/db/branches/search')}</div>
-                <div class="data-field" style="flex:2"><span class="label">כתובת</span>${ef('customer.address', d.customer?.address)}</div>
             </div>
         `;
 
