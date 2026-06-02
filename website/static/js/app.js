@@ -274,10 +274,6 @@ const app = {
             <div class="data-row">
                 <div class="data-field"><span class="label">פריורטי</span>${ef('supplier.priority_supplier_code', d.supplier?.priority_supplier_code)}</div>
             </div>
-            <div class="data-row">
-                <div class="data-field" style="flex:1"><span class="label">חשבון הוצאות</span>${efAc('expense_account', d.expense_account, '/api/db/accounts/search')}</div>
-                <div class="data-field" style="flex:2"></div>
-            </div>
 
             <h4 class="section-header" style="color:#1e40af">🏢 לקוח ${custMatch}</h4>
             <div class="data-row">
