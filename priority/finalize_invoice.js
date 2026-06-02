@@ -158,6 +158,11 @@ function isNotFoundError(step) {
   return step.messagetype === 'error' && err.toLowerCase().includes('no such');
 }
 
+// 'client' as first step = procedure delegates to browser without server closure
+function isClientOnly(step) {
+  return step.type === 'client';
+}
+
 async function main() {
   const [ivnum, filePath] = process.argv.slice(2);
   if (!ivnum) throw new Error('Usage: node finalize_invoice.js <IVNUM> [filePath]');
@@ -241,10 +246,10 @@ async function main() {
   // ===== סגירת החשבונית =====
   // CLOSEPRINTPIV עם activateStart('CLOSEPRINTPIV', 'P') — מחזיר 'client' כשהסגירה הצליחה בשרת
   const procAttempts = [
+    { method: 'activateStart', proc: 'CLOSEPIV',      type: 'P' },
     { method: 'activateStart', proc: 'CLOSEPRINTPIV', type: 'P' },
-    { method: 'activateStart', proc: 'CLOSEPIV', type: 'P' },
-    { method: 'procStart',     proc: 'CLOSEPRINTPIV', type: 'P' },
     { method: 'procStart',     proc: 'CLOSEPIV',      type: 'P' },
+    { method: 'procStart',     proc: 'CLOSEPRINTPIV', type: 'P' },
   ];
 
   let procSucceeded = false;
@@ -265,7 +270,7 @@ async function main() {
     }
     process.stderr.write(`${method} ${proc}: firstStep.type=${firstStep.type}\n`);
 
-    if (isNotFoundError(firstStep)) continue; // לא קיים — נסה הבא
+    if (isNotFoundError(firstStep) || isClientOnly(firstStep)) continue; // לא קיים / דפדפן בלבד — נסה הבא
 
     const result = await runProcedure(firstStep, `${method}_${proc}`, ivnum);
     process.stderr.write(`${method} ${proc}: result=${JSON.stringify(result)}\n`);
