@@ -139,6 +139,21 @@ async def debug_finalize(ivnum: str):
         return {"error": str(e)}
 
 
+@app.get("/api/debug/close_odata/{ivnum}")
+async def debug_close_odata(ivnum: str):
+    """נסה לסגור חשבונית דרך OData bound action — ללא WCF."""
+    result = await priority_client._post(
+        f"PINVOICES(IVNUM='{ivnum}',IVTYPE='P',DEBIT='D')/CLOSEPIV",
+        {},
+    )
+    # גם שליפת IVNUM/FNCNUM אחרי הניסיון
+    after = await priority_client._get(
+        "PINVOICES",
+        params={"$filter": f"IVNUM eq '{ivnum}'", "$select": "IVNUM,FNCNUM", "$top": "1"},
+    )
+    return {"post_result": result, "after": after}
+
+
 @app.get("/api/debug/node")
 async def debug_node():
     """אבחון זמינות Node.js על השרת — ללא אימות."""
