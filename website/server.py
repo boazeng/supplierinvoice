@@ -166,6 +166,7 @@ async def debug_node():
 @app.get("/api/health")
 async def health_check():
     """בדיקת תקינות השרת."""
+    import subprocess as _sp
     priority_ok = False
     if priority_client:
         try:
@@ -173,10 +174,17 @@ async def health_check():
         except Exception:
             pass
 
+    git_commit = ""
+    try:
+        git_commit = _sp.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=str(BASE_DIR), text=True).strip()
+    except Exception:
+        pass
+
     return {
         "status": "ok",
         "priority_connected": priority_ok,
         "invoices_count": len(store.get_all()) if store else 0,
+        "git_commit": git_commit,
     }
 
 
