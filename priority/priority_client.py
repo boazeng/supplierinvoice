@@ -193,6 +193,9 @@ class PriorityClient:
         args = [node_executable, str(js_script), ivnum]
         if file_path and Path(file_path).exists():
             args.append(file_path)
+            logger.info("מצרף קובץ לפריורטי: %s", file_path)
+        elif file_path:
+            logger.warning("קובץ לא נמצא בנתיב: %s — יוחלף ללא צירוף", file_path)
 
         logger.info("מריץ finalize_invoice.js עבור IVNUM %s", ivnum)
         try:
