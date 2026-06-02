@@ -94,8 +94,7 @@ const L = {
 
     async selectCompany(id) {
         L.company = id || null;
-        el('btn-delete-company').style.display = id ? 'inline-flex' : 'none';
-        el('book-card').classList.add('hidden');
+el('book-card').classList.add('hidden');
         L.bookId = null;
         if (!id) { el('books-card').classList.add('hidden'); return; }
         await L.loadBooks();
