@@ -899,14 +899,23 @@ async def fix_divider_doc2():
         ("%חניה%אורבנית%", "%hanaya%")
     ).fetchone()
     if not divider:
-        # מחזיר את כל החוצצים לבחינה
-        all_divs = conn.execute(
-            "SELECT d.id, d.name, d.book_id, c.name AS company FROM ledger_dividers d "
-            "JOIN ledger_books b ON b.id = d.book_id "
-            "JOIN ledger_companies c ON c.id = b.company_id"
-        ).fetchall()
-        conn.close()
-        return {"ok": False, "error": "חוצץ לא נמצא", "all_dividers": [dict(r) for r in all_divs]}
+        # החוצץ לא קיים — יוצרים אותו בספר הנכון לפי מסמך 2
+        doc_row = conn.execute("SELECT book_id FROM ledger_documents WHERE id = 2").fetchone()
+        if not doc_row:
+            conn.close()
+            return {"ok": False, "error": "מסמך 2 לא נמצא"}
+        target_book_id = dict(doc_row)["book_id"]
+        new_div_name = 'חניה מקבוצה אורבנית בע"מ'
+        cur = conn.execute("INSERT INTO ledger_dividers (book_id, name) VALUES (?, ?)",
+                           (target_book_id, new_div_name))
+        conn.commit()
+        divider = conn.execute(
+            "SELECT d.id AS div_id, d.name AS div_name, d.book_id, "
+            "b.year, b.company_id, c.name AS company_name "
+            "FROM ledger_dividers d JOIN ledger_books b ON b.id=d.book_id "
+            "JOIN ledger_companies c ON c.id=b.company_id WHERE d.id=?",
+            (cur.lastrowid,)
+        ).fetchone()
 
     div = dict(divider)
     doc = conn.execute("SELECT id, book_id FROM ledger_documents WHERE id = 2").fetchone()
