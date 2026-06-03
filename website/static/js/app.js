@@ -345,8 +345,8 @@ const app = {
         // הסתרת הזהרות
         document.getElementById('validation-warnings').style.display = 'none';
 
-        // Notes
-        document.getElementById('user-notes').value = inv.user_notes || '';
+        const notesEl = document.getElementById('user-notes');
+        if (notesEl) notesEl.value = inv.user_notes || '';
 
         // כפתורי פעולה לפי סטטוס
         const actionBtns = document.getElementById('action-buttons');
@@ -397,18 +397,18 @@ const app = {
 
         const money = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-        const cellStyle = 'font-size:0.76rem;padding:3px 6px';
+        const cellStyle = 'font-size:0.88rem;padding:4px 8px';
         // שדה חשבון עם autocomplete
         const acInput = (path, val) => `<span class="ac-field" style="position:relative">
             <input class="edit-field ac-input tx-acc-input" data-path="${path}" data-ep="/api/db/accounts/search"
                 value="${val}" placeholder="— חסר —" autocomplete="off" spellcheck="false"
-                style="width:82px;font-size:0.75rem;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--bg-primary);color:var(--text-primary)">
-            <ul class="ac-dd"></ul></span>${sfx ? `<span style="font-size:0.72rem;color:var(--text-secondary)"> -${branch}</span>` : ''}`;
+                style="width:90px;font-size:0.85rem;padding:2px 5px;border:1px solid var(--border);border-radius:3px;background:var(--bg-primary);color:var(--text-primary)">
+            <ul class="ac-dd"></ul></span>${sfx ? `<span style="font-size:0.8rem;color:var(--text-secondary)"> -${branch}</span>` : ''}`;
 
         // שדה סכום עריכה
         const amtInput = (path, val) => `<input class="edit-field tx-amt-input" data-path="${path}"
             value="${parseFloat(val) || 0}"
-            style="width:72px;font-size:0.75rem;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--bg-primary);color:var(--text-primary);text-align:left" type="number" step="0.01" min="0">`;
+            style="width:80px;font-size:0.85rem;padding:2px 5px;border:1px solid var(--border);border-radius:3px;background:var(--bg-primary);color:var(--text-primary);text-align:left" type="number" step="0.01" min="0">`;
 
         // בניית שורות החובה — אם יש שורות חשבונית, נציג אותן; אחרת שורה אחת מסך
         let debitRows = '';
@@ -454,11 +454,11 @@ const app = {
 
         const tdS = `style="${cellStyle}"`;
         box.innerHTML = `
-            <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">
+            <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:4px">
                 פקודת יומן · סניף: ${branch || '—'}${lines.length > 0 ? ` · ${lines.length} שורות` : ''}
                 ${warn ? `<span style="color:var(--danger);margin-right:6px">${warn}</span>` : ''}
             </div>
-            <table style="width:100%;border-collapse:collapse;font-size:0.76rem">
+            <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
                 <thead><tr style="background:var(--bg-tertiary)">
                     <th ${tdS}>חשבון</th><th ${tdS}>תיאור</th><th ${tdS}>חובה</th><th ${tdS}>זכות</th>
                 </tr></thead>
@@ -474,7 +474,7 @@ const app = {
                         <td ${tdS}>₪${money(dr)}</td><td ${tdS}>₪${money(cr)}</td></tr>
                 </tbody>
             </table>
-            <div style="font-size:0.72rem;margin-top:3px;color:${balanced ? 'var(--success)' : 'var(--danger)'}">
+            <div style="font-size:0.82rem;margin-top:4px;color:${balanced ? 'var(--success)' : 'var(--danger)'}">
                 ${balanced ? '✓ מאוזן' : '⚠ לא מאוזן'}</div>`;
 
         box.querySelectorAll('.edit-field').forEach(input => {
@@ -900,7 +900,7 @@ const app = {
 
     async approveInvoice() {
         if (!this.currentInvoice) return;
-        const notes = document.getElementById('user-notes').value;
+        const notes = document.getElementById('user-notes')?.value || '';
         const btn = document.getElementById('btn-submit');
 
         if (btn) {
@@ -940,7 +940,7 @@ const app = {
 
     async rejectInvoice() {
         if (!this.currentInvoice) return;
-        const reason = document.getElementById('user-notes').value || 'נדחה על ידי המשתמש';
+        const reason = document.getElementById('user-notes')?.value || 'נדחה על ידי המשתמש';
 
         try {
             const res = await fetch(`/api/invoices/${this.currentInvoice.id}/reject`, {
