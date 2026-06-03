@@ -271,8 +271,8 @@ const app = {
         let html = `
             ${priorityIvnum}
 
-            <div class="data-section-card">
-                <h4 class="section-header" style="color:var(--accent)">📄 פרטי חשבונית</h4>
+            <div class="data-section-card card-invoice">
+                <h4 class="section-header" style="color:var(--text-secondary)">📄 פרטי חשבונית</h4>
                 <div class="data-row">
                     <div class="data-field"><span class="label">חשבונית</span>${ef('invoice_number', d.invoice_number)}</div>
                     <div class="data-field"><span class="label">תאריך</span>${ef('invoice_date', d.invoice_date)}</div>
@@ -280,7 +280,7 @@ const app = {
                 </div>
             </div>
 
-            <div class="data-section-card">
+            <div class="data-section-card card-supplier">
                 <h4 class="section-header" style="color:var(--accent)">📦 ספק ${supMatch}</h4>
                 <div class="data-row">
                     <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('supplier.name', d.supplier?.name)}</div>
@@ -291,7 +291,7 @@ const app = {
                 </div>
             </div>
 
-            <div class="data-section-card">
+            <div class="data-section-card card-customer">
                 <h4 class="section-header" style="color:#1e40af">🏢 לקוח ${custMatch}</h4>
                 <div class="data-row">
                     <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('customer.name', d.customer?.name)}</div>
@@ -306,8 +306,8 @@ const app = {
 
         // שורות חשבונית
         if (d.lines && d.lines.length > 0) {
-            html += `<div class="data-section-card">
-                <h4 class="section-header" style="color:var(--text-secondary)">📋 שורות חשבונית</h4>
+            html += `<div class="data-section-card card-lines">
+                <h4 class="section-header" style="color:var(--success)">📋 שורות חשבונית</h4>
                 <table class="lines-table">
                     <thead>
                         <tr>
@@ -346,8 +346,8 @@ const app = {
             </div>`;
         } else {
             // סכומים בלי שורות
-            html += `<div class="data-section-card">
-                <h4 class="section-header" style="color:var(--text-secondary)">💰 סכומים</h4>
+            html += `<div class="data-section-card card-lines">
+                <h4 class="section-header" style="color:var(--success)">💰 סכומים</h4>
                 <div class="totals-block">
                     <div class="totals-row"><span class="totals-label">סה"כ ${checkIcon(subtotalOk)}</span><span class="totals-value">₪${subtotal.toLocaleString()}</span></div>
                     <div class="totals-row"><span class="totals-label">מע"מ</span><span class="totals-value">₪${vatAmt.toLocaleString()}</span></div>
@@ -423,18 +423,18 @@ const app = {
 
         const money = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-        const cellStyle = 'font-size:0.88rem;padding:4px 8px';
+        const cellStyle = 'padding:7px 12px';
         // שדה חשבון עם autocomplete
-        const acInput = (path, val) => `<span class="ac-field" style="position:relative">
+        const acInput = (path, val) => `<span class="ac-field" style="position:relative;display:inline-flex">
             <input class="edit-field ac-input tx-acc-input" data-path="${path}" data-ep="/api/db/accounts/search"
                 value="${val}" placeholder="— חסר —" autocomplete="off" spellcheck="false"
-                style="width:90px;font-size:0.85rem;padding:2px 5px;border:1px solid var(--border);border-radius:3px;background:var(--bg-primary);color:var(--text-primary)">
-            <ul class="ac-dd"></ul></span>${sfx ? `<span style="font-size:0.8rem;color:var(--text-secondary)"> -${branch}</span>` : ''}`;
+                style="width:100px;font-size:0.9rem;padding:3px 7px">
+            <ul class="ac-dd"></ul></span>${sfx ? `<span style="font-size:0.85rem;color:var(--text-secondary);margin-right:4px"> -${branch}</span>` : ''}`;
 
         // שדה סכום עריכה
         const amtInput = (path, val) => `<input class="edit-field tx-amt-input" data-path="${path}"
             value="${parseFloat(val) || 0}"
-            style="width:80px;font-size:0.85rem;padding:2px 5px;border:1px solid var(--border);border-radius:3px;background:var(--bg-primary);color:var(--text-primary);text-align:left" type="number" step="0.01" min="0">`;
+            style="width:90px;font-size:0.9rem;padding:3px 7px;text-align:left;direction:ltr" type="number" step="0.01" min="0">`;
 
         // בניית שורות החובה — אם יש שורות חשבונית, נציג אותן; אחרת שורה אחת מסך
         let debitRows = '';
@@ -448,8 +448,8 @@ const app = {
                 const desc = ln.description || `שורה ${i + 1}`;
                 debitRows += `<tr>
                     <td style="${cellStyle}">${acInput('expense_account', expenseAcc)}</td>
-                    <td style="${cellStyle};max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc}">${desc}</td>
-                    <td style="${cellStyle}">₪${money(amt)}</td><td style="${cellStyle}"></td></tr>`;
+                    <td style="${cellStyle};max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc}">${desc}</td>
+                    <td style="${cellStyle};direction:ltr;text-align:left">₪${money(amt)}</td><td style="${cellStyle}"></td></tr>`;
             });
             // אם סכום שורות שונה מ-subtotal — נציג גם subtotal לעריכה
             if (Math.abs(totalDebit - subtotal) > 0.01) {
@@ -462,12 +462,14 @@ const app = {
             debitRows = `<tr>
                 <td style="${cellStyle}">${acInput('expense_account', expenseAcc)}</td>
                 <td style="${cellStyle}">הוצאות</td>
-                <td style="${cellStyle}">${amtInput('subtotal', subtotal)}</td><td style="${cellStyle}"></td></tr>`;
+                <td style="${cellStyle};direction:ltr;text-align:left">${amtInput('subtotal', subtotal)}</td><td style="${cellStyle}"></td></tr>`;
         }
 
         const vatRow = vat > 0 ? `<tr>
-            <td style="${cellStyle}">205-2${sfx}</td><td style="${cellStyle}">מע"מ תשומות</td>
-            <td style="${cellStyle}">${amtInput('vat_amount', vat)}</td><td style="${cellStyle}"></td></tr>` : '';
+            <td style="${cellStyle}">205-2${sfx}</td>
+            <td style="${cellStyle}">מע"מ תשומות</td>
+            <td style="${cellStyle};direction:ltr;text-align:left">${amtInput('vat_amount', vat)}</td>
+            <td style="${cellStyle}"></td></tr>` : '';
 
         const dr = (lines.length > 0 ? totalDebit : subtotal) + vat;
         const cr = total;
@@ -480,28 +482,39 @@ const app = {
 
         const tdS = `style="${cellStyle}"`;
         box.innerHTML = `
-            <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:4px">
-                פקודת יומן · סניף: ${branch || '—'}${lines.length > 0 ? ` · ${lines.length} שורות` : ''}
-                ${warn ? `<span style="color:var(--danger);margin-right:6px">${warn}</span>` : ''}
-            </div>
-            <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
-                <thead><tr style="background:var(--bg-tertiary)">
-                    <th ${tdS}>חשבון</th><th ${tdS}>תיאור</th><th ${tdS}>חובה</th><th ${tdS}>זכות</th>
-                </tr></thead>
-                <tbody>
-                    ${debitRows}
-                    ${vatRow}
-                    <tr>
-                        <td ${tdS}>${acInput('supplier.priority_supplier_code', supplierAcc)}</td>
-                        <td ${tdS}>${(d.supplier && d.supplier.name) || 'ספק'}</td>
-                        <td ${tdS}></td><td ${tdS}>${amtInput('total_amount', total)}</td></tr>
-                    <tr style="font-weight:700;border-top:2px solid var(--border)">
-                        <td ${tdS} colspan="2">סה"כ</td>
-                        <td ${tdS}>₪${money(dr)}</td><td ${tdS}>₪${money(cr)}</td></tr>
-                </tbody>
-            </table>
-            <div style="font-size:0.82rem;margin-top:4px;color:${balanced ? 'var(--success)' : 'var(--danger)'}">
-                ${balanced ? '✓ מאוזן' : '⚠ לא מאוזן'}</div>`;
+            <div class="tx-card">
+                <div class="tx-card-header">
+                    📒 פקודת יומן
+                    <span class="tx-meta">סניף: ${branch || '—'}${lines.length > 0 ? ` · ${lines.length} שורות` : ''}</span>
+                    ${warn ? `<span style="color:var(--danger);font-size:0.82rem;margin-right:auto">${warn}</span>` : ''}
+                </div>
+                <table class="tx-table">
+                    <thead><tr>
+                        <th style="text-align:right">חשבון</th>
+                        <th style="text-align:right">תיאור</th>
+                        <th style="text-align:left;direction:ltr">חובה</th>
+                        <th style="text-align:left;direction:ltr">זכות</th>
+                    </tr></thead>
+                    <tbody>
+                        ${debitRows}
+                        ${vatRow}
+                        <tr>
+                            <td ${tdS}>${acInput('supplier.priority_supplier_code', supplierAcc)}</td>
+                            <td ${tdS}>${(d.supplier && d.supplier.name) || 'ספק'}</td>
+                            <td ${tdS}></td>
+                            <td ${tdS}>${amtInput('total_amount', total)}</td>
+                        </tr>
+                        <tr class="tx-total-row">
+                            <td ${tdS} colspan="2">סה"כ</td>
+                            <td ${tdS} style="${cellStyle};direction:ltr;text-align:left">₪${money(dr)}</td>
+                            <td ${tdS} style="${cellStyle};direction:ltr;text-align:left">₪${money(cr)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="tx-card-footer" style="color:${balanced ? 'var(--success)' : 'var(--danger)'}">
+                    ${balanced ? '✓ מאוזן' : '⚠ לא מאוזן'}
+                </div>
+            </div>`;
 
         box.querySelectorAll('.edit-field').forEach(input => {
             input.addEventListener('change', () => this.saveFieldEdit(input));

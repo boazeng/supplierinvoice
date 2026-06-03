@@ -551,63 +551,72 @@ body {
 }
 
 .data-pane h3 {
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: var(--text-secondary);
     margin: 0;
 }
 
 .section-header {
     margin: 0 !important;
-    font-size: 0.88rem !important;
+    font-size: 0.93rem !important;
     font-weight: 700 !important;
+    letter-spacing: 0.01em;
 }
 
 /* Data Row — שורה עם מספר שדות */
 .data-row {
     display: flex;
-    gap: 8px;
+    gap: 10px;
 }
 
 .data-row .data-field {
     flex: 1;
+    min-width: 0;
 }
 
 /* Data Fields */
 .data-field {
-    display: flex;
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    align-items: center;
     gap: 6px;
-    padding: 3px 0;
-    border-bottom: 1px solid var(--border);
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.07);
     direction: rtl;
 }
 
 .data-field .label {
-    color: var(--text-secondary);
-    font-size: 0.83rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
     white-space: nowrap;
+    font-weight: 600;
+    text-align: right;
 }
 
 .data-field .value {
     font-weight: 500;
-    font-size: 0.91rem;
+    font-size: 0.95rem;
 }
 
 .edit-field {
     flex: 1;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    width: 100%;
+    background: var(--bg-card);
+    border: 1.5px solid var(--border);
+    border-radius: 5px;
     color: var(--text-primary);
-    font-size: 0.89rem;
+    font-size: 0.93rem;
     font-weight: 500;
-    padding: 3px 7px;
+    padding: 4px 8px;
     direction: rtl;
     min-width: 0;
+    transition: border-color 0.15s;
 }
 .edit-field:focus {
     outline: none;
     border-color: var(--accent);
-    background: var(--bg-secondary);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(31,58,95,0.08);
 }
 
 /* === Autocomplete field === */
@@ -651,8 +660,8 @@ body {
 .edit-line {
     width: 100%;
     box-sizing: border-box;
-    padding: 1px 4px;
-    font-size: 0.8rem;
+    padding: 3px 5px;
+    font-size: 0.88rem;
 }
 
 /* Lines Table */
@@ -812,15 +821,21 @@ body {
 .data-section-card {
     background: var(--bg-card);
     border: 1.5px solid var(--border);
+    border-right: 4px solid var(--accent);
     border-radius: 10px;
     overflow: hidden;
     margin-bottom: 10px;
-    box-shadow: 0 1px 4px rgba(28,27,25,0.05);
+    box-shadow: 0 2px 6px rgba(28,27,25,0.06);
 }
+
+.data-section-card.card-supplier { border-right-color: #1F3A5F; }
+.data-section-card.card-customer { border-right-color: #1e40af; }
+.data-section-card.card-invoice  { border-right-color: #706A60; }
+.data-section-card.card-lines    { border-right-color: var(--success); }
 
 .data-section-card .section-header {
     background: var(--bg-secondary);
-    padding: 7px 12px !important;
+    padding: 8px 14px !important;
     border-bottom: 1.5px solid var(--border);
     border-radius: 0 !important;
     display: flex;
@@ -829,28 +844,93 @@ body {
 }
 
 .data-section-card .data-row {
-    padding: 4px 12px;
-    gap: 10px;
+    padding: 2px 14px 0;
+    gap: 12px;
 }
 
 .data-section-card .data-field {
-    border-bottom: 1px dashed rgba(0,0,0,0.07);
-    padding: 5px 0;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 
 .data-section-card .data-row:last-child .data-field {
     border-bottom: none;
 }
 
-/* ac-field inside cards */
-.data-section-card .data-row {
-    padding: 3px 12px 0;
+/* Totals inside card */
+.data-section-card .totals-block {
+    margin: 6px 14px 10px;
+    width: auto;
 }
 
-/* Totals card */
-.data-section-card .totals-block {
-    margin: 4px 12px 8px;
-    width: auto;
+/* === Transaction Preview Card === */
+.tx-card {
+    background: var(--bg-card);
+    border: 1.5px solid var(--border);
+    border-right: 4px solid var(--warning);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 8px 0 4px;
+    box-shadow: 0 2px 6px rgba(28,27,25,0.06);
+}
+
+.tx-card-header {
+    background: var(--bg-secondary);
+    border-bottom: 1.5px solid var(--border);
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.93rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.tx-card-header .tx-meta {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.tx-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.93rem;
+}
+
+.tx-table th {
+    background: var(--bg-secondary);
+    padding: 7px 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.tx-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    vertical-align: middle;
+}
+
+.tx-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.tx-table .tx-total-row {
+    font-weight: 700;
+    background: var(--bg-secondary);
+    border-top: 2px solid var(--border);
+}
+
+.tx-table .tx-total-row td {
+    border-bottom: none;
+}
+
+.tx-card-footer {
+    padding: 5px 14px 8px;
+    font-size: 0.88rem;
+    font-weight: 500;
 }
 
 /* === Responsive === */
