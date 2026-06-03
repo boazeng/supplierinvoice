@@ -884,7 +884,7 @@ async def move_doc_to_company(request: Request):
 
 
 
-@app.get("/api/debug/fix-divider-doc2-xK9m2026")
+@app.get("/api/debug/fix-divider-doc2-xK9m2026-done")
 async def fix_divider_doc2():
     """חד-פעמי: שיוך מסמך 2 לחוצץ 'חניה מקבוצה אורבנית בע\"מ' — חיפוש גלובלי."""
     conn = ledger_db._conn()
