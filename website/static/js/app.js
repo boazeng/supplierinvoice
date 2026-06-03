@@ -915,7 +915,8 @@ const app = {
                 return;
             }
             const companyLabel = data.company_name || data.branch;
-            this.showToast(`תויק בספרי הנהלת חשבונות — ${companyLabel} / ${data.year}`, 'success');
+            const dividerLabel = data.divider_name ? ` / ${data.divider_name}` : '';
+            this.showToast(`תויק בספרי הנהלת חשבונות — ${companyLabel} / ${data.year}${dividerLabel}`, 'success');
             this.closeModal();
             this.loadInvoices();
         } catch (err) {

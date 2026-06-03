@@ -643,10 +643,14 @@ async def file_invoice_to_ledger(invoice_id: str):
         raise HTTPException(status_code=400, detail="ניתן לתייק רק חשבוניות בסטטוס 'ממתין לתיוק'")
 
     d = invoice.extracted_data
-    branch = (d.customer.branch if d else "") or "כללי"
-    # שם החברה בספרים — שם הלקוח המלא, ואם חסר — קוד הסניף
+    branch = (d.customer.branch if d else "") or ""
     customer_name = (d.customer.name if d else "") or ""
-    company_name = re.sub(r'[\\/:*?"<>|]', '_', customer_name or branch)
+    # שם החברה: שם לקוח + קוד סניף (אם קיים)
+    base_name = customer_name or branch or "כללי"
+    if branch and customer_name and branch not in customer_name:
+        company_name = re.sub(r'[\\/:*?"<>|]', '_', f"{customer_name} - {branch}")
+    else:
+        company_name = re.sub(r'[\\/:*?"<>|]', '_', base_name)
     supplier_name = re.sub(r'[\\/:*?"<>|]', '_', (d.supplier.name if d else "") or "ספק")
     invoice_num = re.sub(r'[\\/:*?"<>|]', '_', (d.invoice_number if d else "") or invoice_id[:8])
     invoice_date = (d.invoice_date if d else "") or date_cls.today().isoformat()
@@ -657,7 +661,8 @@ async def file_invoice_to_ledger(invoice_id: str):
 
     company_id = ledger_db.find_or_create_company(company_name)
     book_id = ledger_db.find_or_create_book(company_id, year)
-    divider_id = ledger_db.find_or_create_divider(book_id, supplier_name)
+    # חיפוש חוצץ קיים בלבד — לעולם לא יוצרים חוצץ חדש אוטומטית
+    divider_id = ledger_db.find_best_matching_divider(book_id, supplier_name)
 
     ext = Path(invoice.file_path).suffix.lower()
     filename = f"{supplier_name}_{invoice_num}{ext}"
@@ -682,8 +687,16 @@ async def file_invoice_to_ledger(invoice_id: str):
     invoice.status = InvoiceStatus.FILED
     invoice.updated_at = datetime.now().isoformat()
     store.save(invoice)
-    logger.info("חשבונית %s תויקה בספרי הנהלת חשבונות — %s/%d", invoice_id, company_name, year)
-    return {"ok": True, "branch": branch, "company_name": company_name, "year": year}
+    # שם החוצץ לתצוגה ב-toast
+    divider_name = ""
+    if divider_id:
+        dividers = ledger_db.list_dividers(book_id)
+        div_map = {d["id"]: d["name"] for d in dividers}
+        divider_name = div_map.get(divider_id, "")
+    logger.info("חשבונית %s תויקה בספרי הנהלת חשבונות — %s/%d/%s",
+                invoice_id, company_name, year, divider_name or "ללא חוצץ")
+    return {"ok": True, "branch": branch, "company_name": company_name,
+            "year": year, "divider_name": divider_name}
 
 
 @app.post("/api/invoices/{invoice_id}/approve")

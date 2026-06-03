@@ -215,6 +215,45 @@ def find_or_create_divider(book_id: int, name: str) -> int:
     return did
 
 
+def find_best_matching_divider(book_id: int, supplier_name: str) -> Optional[int]:
+    """מוצא חוצץ קיים שמתאים לשם הספק — לעולם לא יוצר חדש.
+    מחזיר None אם אין חוצץ מתאים."""
+    conn = _conn()
+    dividers = conn.execute(
+        "SELECT id, name FROM ledger_dividers WHERE book_id = ?", (book_id,)
+    ).fetchall()
+    conn.close()
+    if not dividers:
+        return None
+
+    def normalize(s: str) -> str:
+        return s.strip().replace("'", "").replace('"', "").replace("-", " ").lower()
+
+    sup_norm = normalize(supplier_name)
+    sup_words = set(w for w in sup_norm.split() if len(w) > 1)
+
+    best_id = None
+    best_score = 0.0
+
+    for div in dividers:
+        div_norm = normalize(div["name"])
+        div_words = set(w for w in div_norm.split() if len(w) > 1)
+
+        # ציון לפי חפיפת מילים
+        if sup_words and div_words:
+            common = sup_words & div_words
+            score = len(common) / max(len(sup_words), len(div_words))
+        else:
+            # בדיקת תת-מחרוזת כ-fallback
+            score = 0.5 if sup_norm in div_norm or div_norm in sup_norm else 0.0
+
+        if score > best_score:
+            best_score = score
+            best_id = div["id"]
+
+    return best_id if best_score >= 0.3 else None
+
+
 def delete_divider(divider_id: int) -> None:
     conn = _conn()
     # מסמכים שהיו בחוצץ — מתנתקים ממנו (לא נמחקים)
