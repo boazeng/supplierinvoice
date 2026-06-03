@@ -270,37 +270,44 @@ const app = {
 
         let html = `
             ${priorityIvnum}
-            <h4 class="section-header" style="color:var(--accent)">📄 פרטי חשבונית</h4>
-            <div class="data-row">
-                <div class="data-field"><span class="label">חשבונית</span>${ef('invoice_number', d.invoice_number)}</div>
-                <div class="data-field"><span class="label">תאריך</span>${ef('invoice_date', d.invoice_date)}</div>
-                <div class="data-field"><span class="label">הקצאה</span>${ef('allocation_number', d.allocation_number)}</div>
+
+            <div class="data-section-card">
+                <h4 class="section-header" style="color:var(--accent)">📄 פרטי חשבונית</h4>
+                <div class="data-row">
+                    <div class="data-field"><span class="label">חשבונית</span>${ef('invoice_number', d.invoice_number)}</div>
+                    <div class="data-field"><span class="label">תאריך</span>${ef('invoice_date', d.invoice_date)}</div>
+                    <div class="data-field"><span class="label">הקצאה</span>${ef('allocation_number', d.allocation_number)}</div>
+                </div>
             </div>
 
-            <h4 class="section-header" style="color:var(--accent)">📦 ספק ${supMatch}</h4>
-            <div class="data-row">
-                <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('supplier.name', d.supplier?.name)}</div>
-                <div class="data-field"><span class="label">${supTax}</span>${ef('supplier.tax_id', d.supplier?.tax_id)}</div>
-            </div>
-            <div class="data-row">
-                <div class="data-field"><span class="label">פריורטי</span>${ef('supplier.priority_supplier_code', d.supplier?.priority_supplier_code)}</div>
+            <div class="data-section-card">
+                <h4 class="section-header" style="color:var(--accent)">📦 ספק ${supMatch}</h4>
+                <div class="data-row">
+                    <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('supplier.name', d.supplier?.name)}</div>
+                    <div class="data-field"><span class="label">${supTax}</span>${ef('supplier.tax_id', d.supplier?.tax_id)}</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-field"><span class="label">פריורטי</span>${ef('supplier.priority_supplier_code', d.supplier?.priority_supplier_code)}</div>
+                </div>
             </div>
 
-            <h4 class="section-header" style="color:#1e40af">🏢 לקוח ${custMatch}</h4>
-            <div class="data-row">
-                <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('customer.name', d.customer?.name)}</div>
-                <div class="data-field"><span class="label">${custTax}</span>${ef('customer.tax_id', d.customer?.tax_id)}</div>
-            </div>
-            <div class="data-row">
-                <div class="data-field"><span class="label">פריורטי</span>${ef('customer.priority_customer_code', d.customer?.priority_customer_code)}</div>
-                <div class="data-field"><span class="label">סניף</span>${efAc('customer.branch', d.customer?.branch, '/api/db/branches/search')}</div>
+            <div class="data-section-card">
+                <h4 class="section-header" style="color:#1e40af">🏢 לקוח ${custMatch}</h4>
+                <div class="data-row">
+                    <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('customer.name', d.customer?.name)}</div>
+                    <div class="data-field"><span class="label">${custTax}</span>${ef('customer.tax_id', d.customer?.tax_id)}</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-field"><span class="label">פריורטי</span>${ef('customer.priority_customer_code', d.customer?.priority_customer_code)}</div>
+                    <div class="data-field"><span class="label">סניף</span>${efAc('customer.branch', d.customer?.branch, '/api/db/branches/search')}</div>
+                </div>
             </div>
         `;
 
         // שורות חשבונית
         if (d.lines && d.lines.length > 0) {
-            html += `
-                <h4 style="margin-top:12px; color:var(--text-secondary)">שורות חשבונית</h4>
+            html += `<div class="data-section-card">
+                <h4 class="section-header" style="color:var(--text-secondary)">📋 שורות חשבונית</h4>
                 <table class="lines-table">
                     <thead>
                         <tr>
@@ -330,18 +337,26 @@ const app = {
                     </tr>
                 `;
             }
-            html += '</tbody></table>';
+            html += `</tbody></table>
+                <div class="totals-block">
+                    <div class="totals-row"><span class="totals-label">סה"כ ${checkIcon(subtotalOk)}</span><span class="totals-value">₪${subtotal.toLocaleString()}</span></div>
+                    <div class="totals-row"><span class="totals-label">מע"מ</span><span class="totals-value">₪${vatAmt.toLocaleString()}</span></div>
+                    <div class="totals-row totals-grand"><span class="totals-label">סה"כ כולל מע"מ ${checkIcon(totalOk)}</span><span class="totals-value">₪${totalAmt.toLocaleString()}</span></div>
+                </div>
+            </div>`;
+        } else {
+            // סכומים בלי שורות
+            html += `<div class="data-section-card">
+                <h4 class="section-header" style="color:var(--text-secondary)">💰 סכומים</h4>
+                <div class="totals-block">
+                    <div class="totals-row"><span class="totals-label">סה"כ ${checkIcon(subtotalOk)}</span><span class="totals-value">₪${subtotal.toLocaleString()}</span></div>
+                    <div class="totals-row"><span class="totals-label">מע"מ</span><span class="totals-value">₪${vatAmt.toLocaleString()}</span></div>
+                    <div class="totals-row totals-grand"><span class="totals-label">סה"כ כולל מע"מ ${checkIcon(totalOk)}</span><span class="totals-value">₪${totalAmt.toLocaleString()}</span></div>
+                </div>
+            </div>`;
         }
 
-        // סכומים — מיושרים לימין כמו בחשבונית
-        html += `
-            <div class="totals-block">
-                <div class="totals-row"><span class="totals-label">סה"כ ${checkIcon(subtotalOk)}</span><span class="totals-value">₪${subtotal.toLocaleString()}</span></div>
-                <div class="totals-row"><span class="totals-label">מע"מ</span><span class="totals-value">₪${vatAmt.toLocaleString()}</span></div>
-                <div class="totals-row totals-grand"><span class="totals-label">סה"כ כולל מע"מ ${checkIcon(totalOk)}</span><span class="totals-value">₪${totalAmt.toLocaleString()}</span></div>
-            </div>
-            <div class="data-field"><span class="label">רמת ביטחון</span><span class="value">${Math.round((d.confidence_score || 0) * 100)}%</span></div>
-        `;
+        html += `<div style="font-size:0.82rem;color:var(--text-muted);padding:2px 4px 6px">רמת ביטחון: ${Math.round((d.confidence_score || 0) * 100)}%</div>`;
 
         dataDiv.innerHTML = html;
 

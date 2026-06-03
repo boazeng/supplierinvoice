@@ -808,6 +808,51 @@ body {
     to   { transform: translateX(0);     opacity: 1; }
 }
 
+/* === Data Section Cards (modal) === */
+.data-section-card {
+    background: var(--bg-card);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(28,27,25,0.05);
+}
+
+.data-section-card .section-header {
+    background: var(--bg-secondary);
+    padding: 7px 12px !important;
+    border-bottom: 1.5px solid var(--border);
+    border-radius: 0 !important;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.data-section-card .data-row {
+    padding: 4px 12px;
+    gap: 10px;
+}
+
+.data-section-card .data-field {
+    border-bottom: 1px dashed rgba(0,0,0,0.07);
+    padding: 5px 0;
+}
+
+.data-section-card .data-row:last-child .data-field {
+    border-bottom: none;
+}
+
+/* ac-field inside cards */
+.data-section-card .data-row {
+    padding: 3px 12px 0;
+}
+
+/* Totals card */
+.data-section-card .totals-block {
+    margin: 4px 12px 8px;
+    width: auto;
+}
+
 /* === Responsive === */
 @media (max-width: 768px) {
     .modal-body {
