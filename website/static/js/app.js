@@ -138,11 +138,14 @@ const app = {
             const date = inv.created_at
                 ? new Date(inv.created_at).toLocaleDateString('he-IL')
                 : '';
+            const priorityId = inv.priority_invoice_id && !inv.priority_invoice_id.toUpperCase().startsWith('T')
+                ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${inv.priority_invoice_id}</div>`
+                : '';
 
             return `
                 <tr onclick="app.openInvoice('${inv.id}')">
                     <td>${supplierName}</td>
-                    <td>${invoiceNum}</td>
+                    <td>${invoiceNum}${priorityId}</td>
                     <td class="col-amount">${fmt(beforeVat)}</td>
                     <td class="col-amount">${fmt(afterVat)}</td>
                     <td>${date}</td>
@@ -258,7 +261,15 @@ const app = {
         const subtotalOk = approxEq(linesSum, subtotal) || linesSum === 0;
         const totalOk = approxEq(subtotal + vatAmt, totalAmt);
 
+        const priorityIvnum = inv.priority_invoice_id && !inv.priority_invoice_id.toUpperCase().startsWith('T')
+            ? `<div style="display:inline-flex;align-items:center;gap:6px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:4px 10px;margin-bottom:8px;font-size:0.85rem">
+                <span style="color:var(--text-muted)">מס׳ פריורטי:</span>
+                <strong style="color:var(--accent)">${inv.priority_invoice_id}</strong>
+               </div>`
+            : '';
+
         let html = `
+            ${priorityIvnum}
             <h4 class="section-header" style="color:var(--accent)">📄 פרטי חשבונית</h4>
             <div class="data-row">
                 <div class="data-field"><span class="label">חשבונית</span>${ef('invoice_number', d.invoice_number)}</div>
