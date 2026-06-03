@@ -884,6 +884,37 @@ async def move_doc_to_company(request: Request):
 
 
 
+@app.get("/api/debug/fix-divider-doc2-xK9m2026")
+async def fix_divider_doc2():
+    """חד-פעמי: שיוך מסמך 2 לחוצץ 'חניה מקבוצה אורבנית בע\"מ'."""
+    target_divider_name = 'חניה מקבוצה אורבנית בע"מ'
+    conn = ledger_db._conn()
+    doc = conn.execute("SELECT * FROM ledger_documents WHERE id = 2").fetchone()
+    if not doc:
+        conn.close()
+        return {"ok": False, "error": "מסמך 2 לא נמצא"}
+    book_id = dict(doc)["book_id"]
+    divider = conn.execute(
+        "SELECT id FROM ledger_dividers WHERE book_id = ? AND name = ?",
+        (book_id, target_divider_name)
+    ).fetchone()
+    if not divider:
+        # חיפוש חלקי
+        divider = conn.execute(
+            "SELECT id, name FROM ledger_dividers WHERE book_id = ? AND name LIKE ?",
+            (book_id, "%חניה%אורבנית%")
+        ).fetchone()
+    if not divider:
+        all_divs = conn.execute("SELECT id, name FROM ledger_dividers WHERE book_id = ?", (book_id,)).fetchall()
+        conn.close()
+        return {"ok": False, "error": "חוצץ לא נמצא", "available": [dict(d) for d in all_divs]}
+    divider_id = dict(divider)["id"]
+    conn.execute("UPDATE ledger_documents SET divider_id = ? WHERE id = 2", (divider_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "doc_id": 2, "divider_id": divider_id, "divider_name": target_divider_name}
+
+
 @app.post("/api/invoices/{invoice_id}/approve")
 async def approve_invoice(invoice_id: str, background_tasks: BackgroundTasks, body: dict = {}):
     """
