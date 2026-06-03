@@ -766,6 +766,123 @@ async def fix_last_filed_document(request: Request):
     }
 
 
+@app.get("/api/admin/ledger/diagnose")
+async def diagnose_last_filed(request: Request):
+    """מידע על המסמך האחרון שתויק וכל החברות הקיימות."""
+    if not request.session.get("user_email"):
+        raise HTTPException(status_code=401, detail="נדרשת התחברות")
+    conn = ledger_db._conn()
+    doc_row = conn.execute("""
+        SELECT d.id, d.title, d.invoice_id, d.divider_id,
+               b.id AS book_id, b.year, b.company_id,
+               c.id AS cid, c.name AS company_name,
+               div.name AS divider_name
+        FROM ledger_documents d
+        JOIN ledger_books b ON b.id = d.book_id
+        JOIN ledger_companies c ON c.id = b.company_id
+        LEFT JOIN ledger_dividers div ON div.id = d.divider_id
+        WHERE d.invoice_id != '' AND d.invoice_id IS NOT NULL
+        ORDER BY d.id DESC LIMIT 1
+    """).fetchone()
+    all_companies = conn.execute(
+        "SELECT c.id, c.name, COUNT(d.id) AS doc_count "
+        "FROM ledger_companies c "
+        "LEFT JOIN ledger_books b ON b.company_id = c.id "
+        "LEFT JOIN ledger_documents d ON d.book_id = b.id "
+        "GROUP BY c.id ORDER BY c.id"
+    ).fetchall()
+    conn.close()
+    return {
+        "last_filed_doc": dict(doc_row) if doc_row else None,
+        "all_companies": [dict(r) for r in all_companies],
+    }
+
+
+@app.post("/api/admin/ledger/move-to-company")
+async def move_doc_to_company(request: Request):
+    """מעביר את המסמך האחרון שתויק לחברה הנכונה ומוחק את החברה שנוצרה אוטומטית."""
+    if not request.session.get("user_email"):
+        raise HTTPException(status_code=401, detail="נדרשת התחברות")
+
+    body = await request.json()
+    target_company_id = int(body.get("target_company_id", 0))
+    if not target_company_id:
+        raise HTTPException(status_code=400, detail="חסר target_company_id")
+
+    conn = ledger_db._conn()
+    doc_row = conn.execute("""
+        SELECT d.id, d.title, d.invoice_id, d.divider_id,
+               b.id AS book_id, b.year, b.company_id,
+               c.name AS company_name
+        FROM ledger_documents d
+        JOIN ledger_books b ON b.id = d.book_id
+        JOIN ledger_companies c ON c.id = b.company_id
+        WHERE d.invoice_id != '' AND d.invoice_id IS NOT NULL
+        ORDER BY d.id DESC LIMIT 1
+    """).fetchone()
+    conn.close()
+
+    if not doc_row:
+        return {"ok": False, "error": "לא נמצא מסמך שתויק"}
+
+    doc = dict(doc_row)
+    old_company_id = doc["company_id"]
+    old_company_name = doc["company_name"]
+    year = doc["year"]
+
+    # ספר בחברה הנכונה לאותה שנה
+    target_book_id = ledger_db.find_or_create_book(target_company_id, year)
+
+    # חוצץ מתאים בחברה הנכונה
+    invoice = store.get(doc["invoice_id"]) if doc.get("invoice_id") else None
+    if invoice and invoice.extracted_data and invoice.extracted_data.supplier:
+        supplier_name = invoice.extracted_data.supplier.name or ""
+    else:
+        supplier_name = (doc.get("title") or "").split(" ")[0].replace("_", " ")
+    target_divider_id = ledger_db.find_best_matching_divider(target_book_id, supplier_name)
+
+    # העברת המסמך
+    conn = ledger_db._conn()
+    conn.execute("UPDATE ledger_documents SET book_id = ?, divider_id = ? WHERE id = ?",
+                 (target_book_id, target_divider_id, doc["id"]))
+    conn.commit()
+    conn.close()
+
+    # מחיקת ספר + חברה ישנים אם ריקים
+    old_books = ledger_db.list_books(old_company_id)
+    company_deleted = False
+    conn = ledger_db._conn()
+    for book in old_books:
+        remaining = conn.execute("SELECT COUNT(*) FROM ledger_documents WHERE book_id = ?",
+                                 (book["id"],)).fetchone()[0]
+        if remaining == 0:
+            conn.execute("DELETE FROM ledger_dividers WHERE book_id = ?", (book["id"],))
+            conn.execute("DELETE FROM ledger_books WHERE id = ?", (book["id"],))
+    conn.commit()
+    remaining_books = conn.execute("SELECT COUNT(*) FROM ledger_books WHERE company_id = ?",
+                                    (old_company_id,)).fetchone()[0]
+    if remaining_books == 0:
+        conn.execute("DELETE FROM ledger_companies WHERE id = ?", (old_company_id,))
+        company_deleted = True
+    conn.commit()
+    conn.close()
+
+    divider_name = ""
+    if target_divider_id:
+        div_map = {d["id"]: d["name"] for d in ledger_db.list_dividers(target_book_id)}
+        divider_name = div_map.get(target_divider_id, "")
+
+    return {
+        "ok": True,
+        "doc_title": doc.get("title"),
+        "from_company": old_company_name,
+        "to_company_id": target_company_id,
+        "year": year,
+        "divider": divider_name or "ללא חוצץ",
+        "old_company_deleted": company_deleted,
+    }
+
+
 @app.post("/api/invoices/{invoice_id}/approve")
 async def approve_invoice(invoice_id: str, background_tasks: BackgroundTasks, body: dict = {}):
     """
