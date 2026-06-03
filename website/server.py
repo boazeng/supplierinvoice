@@ -883,7 +883,7 @@ async def move_doc_to_company(request: Request):
     }
 
 
-@app.get("/api/admin/one-time-fix-hanaya-xK9m2026")
+@app.get("/api/debug/one-time-fix-hanaya-xK9m2026")
 async def one_time_fix_hanaya():
     """תיקון חד-פעמי: העברת חשבונית מ'חניה מקבוצה אורבנית בע_מ' ל'חניה מקבוצה אורבנית'."""
     conn = ledger_db._conn()
