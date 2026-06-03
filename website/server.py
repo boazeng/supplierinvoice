@@ -699,6 +699,73 @@ async def file_invoice_to_ledger(invoice_id: str):
             "year": year, "divider_name": divider_name}
 
 
+@app.post("/api/admin/ledger/fix-last-filed")
+async def fix_last_filed_document(request: Request):
+    """תיקון חוצץ של המסמך האחרון שתויק — מחפש חוצץ קיים מתאים ומעביר אליו."""
+    if not request.session.get("user_email"):
+        raise HTTPException(status_code=401, detail="נדרשת התחברות")
+
+    conn = ledger_db._conn()
+    doc_row = conn.execute("""
+        SELECT d.*, div.name AS divider_name
+        FROM ledger_documents d
+        LEFT JOIN ledger_dividers div ON div.id = d.divider_id
+        WHERE d.invoice_id != '' AND d.invoice_id IS NOT NULL
+        ORDER BY d.id DESC LIMIT 1
+    """).fetchone()
+    conn.close()
+
+    if not doc_row:
+        return {"ok": False, "error": "לא נמצא מסמך שתויק"}
+
+    doc = dict(doc_row)
+    book_id = doc["book_id"]
+    current_divider_id = doc.get("divider_id")
+    current_divider_name = doc.get("divider_name") or "ללא חוצץ"
+
+    # ניסיון לקחת שם ספק מחשבונית המקורית אם עדיין קיימת
+    invoice = store.get(doc["invoice_id"]) if doc.get("invoice_id") else None
+    if invoice and invoice.extracted_data and invoice.extracted_data.supplier:
+        supplier_name = invoice.extracted_data.supplier.name or ""
+    else:
+        # fallback: הספק הוא החלק הראשון של הכותרת
+        supplier_name = (doc.get("title") or "").split(" ")[0].replace("_", " ")
+
+    # כל החוצצים בספר (ממוין — ייתכן שהחוצץ הנוכחי הוא הלא-נכון)
+    all_dividers = ledger_db.list_dividers(book_id)
+
+    # מחפש חוצץ מתאים מבין כולם (כולל הנוכחי)
+    best_id = ledger_db.find_best_matching_divider(book_id, supplier_name)
+
+    if not best_id or best_id == current_divider_id:
+        return {
+            "ok": True, "moved": False,
+            "doc_title": doc.get("title"), "supplier_name": supplier_name,
+            "current_divider": current_divider_name,
+            "available_dividers": [d["name"] for d in all_dividers],
+            "message": "לא נמצא חוצץ מתאים יותר — העבר ידנית",
+        }
+
+    ledger_db.update_document(doc["id"], divider_id=best_id)
+
+    deleted_old = False
+    if current_divider_id:
+        remaining = ledger_db.list_documents(book_id, divider_id=current_divider_id)
+        if not remaining:
+            ledger_db.delete_divider(current_divider_id)
+            deleted_old = True
+
+    target = next((d for d in all_dividers if d["id"] == best_id), {})
+    return {
+        "ok": True, "moved": True,
+        "doc_id": doc["id"], "doc_title": doc.get("title"),
+        "supplier_name": supplier_name,
+        "from_divider": current_divider_name,
+        "to_divider": target.get("name", str(best_id)),
+        "old_divider_deleted": deleted_old,
+    }
+
+
 @app.post("/api/invoices/{invoice_id}/approve")
 async def approve_invoice(invoice_id: str, background_tasks: BackgroundTasks, body: dict = {}):
     """
