@@ -886,33 +886,54 @@ async def move_doc_to_company(request: Request):
 
 @app.get("/api/debug/fix-divider-doc2-xK9m2026")
 async def fix_divider_doc2():
-    """חד-פעמי: שיוך מסמך 2 לחוצץ 'חניה מקבוצה אורבנית בע\"מ'."""
-    target_divider_name = 'חניה מקבוצה אורבנית בע"מ'
+    """חד-פעמי: שיוך מסמך 2 לחוצץ 'חניה מקבוצה אורבנית בע\"מ' — חיפוש גלובלי."""
     conn = ledger_db._conn()
-    doc = conn.execute("SELECT * FROM ledger_documents WHERE id = 2").fetchone()
+    # חיפוש החוצץ בכל הספרים
+    divider = conn.execute(
+        "SELECT d.id AS div_id, d.name AS div_name, d.book_id, "
+        "b.year, b.company_id, c.name AS company_name "
+        "FROM ledger_dividers d "
+        "JOIN ledger_books b ON b.id = d.book_id "
+        "JOIN ledger_companies c ON c.id = b.company_id "
+        "WHERE d.name LIKE ? OR d.name LIKE ?",
+        ("%חניה%אורבנית%", "%hanaya%")
+    ).fetchone()
+    if not divider:
+        # מחזיר את כל החוצצים לבחינה
+        all_divs = conn.execute(
+            "SELECT d.id, d.name, d.book_id, c.name AS company FROM ledger_dividers d "
+            "JOIN ledger_books b ON b.id = d.book_id "
+            "JOIN ledger_companies c ON c.id = b.company_id"
+        ).fetchall()
+        conn.close()
+        return {"ok": False, "error": "חוצץ לא נמצא", "all_dividers": [dict(r) for r in all_divs]}
+
+    div = dict(divider)
+    doc = conn.execute("SELECT id, book_id FROM ledger_documents WHERE id = 2").fetchone()
     if not doc:
         conn.close()
         return {"ok": False, "error": "מסמך 2 לא נמצא"}
-    book_id = dict(doc)["book_id"]
-    divider = conn.execute(
-        "SELECT id FROM ledger_dividers WHERE book_id = ? AND name = ?",
-        (book_id, target_divider_name)
-    ).fetchone()
-    if not divider:
-        # חיפוש חלקי
-        divider = conn.execute(
-            "SELECT id, name FROM ledger_dividers WHERE book_id = ? AND name LIKE ?",
-            (book_id, "%חניה%אורבנית%")
-        ).fetchone()
-    if not divider:
-        all_divs = conn.execute("SELECT id, name FROM ledger_dividers WHERE book_id = ?", (book_id,)).fetchall()
-        conn.close()
-        return {"ok": False, "error": "חוצץ לא נמצא", "available": [dict(d) for d in all_divs]}
-    divider_id = dict(divider)["id"]
-    conn.execute("UPDATE ledger_documents SET divider_id = ? WHERE id = 2", (divider_id,))
+
+    # אם המסמך לא בספר הנכון — מעביר גם את הספר
+    if dict(doc)["book_id"] != div["book_id"]:
+        conn.execute("UPDATE ledger_documents SET book_id = ?, divider_id = ? WHERE id = 2",
+                     (div["book_id"], div["div_id"]))
+    else:
+        conn.execute("UPDATE ledger_documents SET divider_id = ? WHERE id = 2", (div["div_id"],))
+
+    # מנקה ספר ריק שנוצר בטעות
+    old_book_id = dict(doc)["book_id"]
+    if old_book_id != div["book_id"]:
+        remaining = conn.execute("SELECT COUNT(*) FROM ledger_documents WHERE book_id = ?",
+                                 (old_book_id,)).fetchone()[0]
+        if remaining == 0:
+            conn.execute("DELETE FROM ledger_dividers WHERE book_id = ?", (old_book_id,))
+            conn.execute("DELETE FROM ledger_books WHERE id = ?", (old_book_id,))
+
     conn.commit()
     conn.close()
-    return {"ok": True, "doc_id": 2, "divider_id": divider_id, "divider_name": target_divider_name}
+    return {"ok": True, "doc_id": 2, "divider": div["div_name"],
+            "company": div["company_name"], "year": div["year"]}
 
 
 @app.post("/api/invoices/{invoice_id}/approve")
