@@ -1231,7 +1231,8 @@ const app = {
         toast.className = `toast toast-${type}`;
         toast.textContent = message;
         container.appendChild(toast);
-        setTimeout(() => toast.remove(), 4000);
+        const duration = type === 'success' ? 7000 : 4000;
+        setTimeout(() => toast.remove(), duration);
     },
 };
 
