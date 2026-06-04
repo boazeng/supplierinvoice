@@ -924,6 +924,65 @@ async def ledger_state():
     }
 
 
+@app.get("/api/debug/move-doc-xK9m")
+async def move_doc_debug(doc_id: int, target_company_id: int):
+    """חד-פעמי: העברת מסמך לחברה הנכונה + מחיקת החברה הריקה שנוצרה אוטומטית."""
+    conn = ledger_db._conn()
+    doc = conn.execute(
+        "SELECT d.id, d.book_id, b.company_id, b.year "
+        "FROM ledger_documents d JOIN ledger_books b ON b.id = d.book_id WHERE d.id = ?",
+        (doc_id,)
+    ).fetchone()
+    if not doc:
+        conn.close()
+        return {"ok": False, "error": f"מסמך {doc_id} לא נמצא"}
+    doc = dict(doc)
+    old_company_id = doc["company_id"]
+    year = doc["year"]
+
+    # ספר ביעד
+    target_book_id = ledger_db.find_or_create_book(target_company_id, year)
+
+    # חוצץ מתאים
+    invoice = store.get(dict(conn.execute(
+        "SELECT invoice_id FROM ledger_documents WHERE id=?", (doc_id,)).fetchone() or {}).get("invoice_id", ""))
+    supplier_name = ""
+    if invoice and invoice.extracted_data and invoice.extracted_data.supplier:
+        supplier_name = invoice.extracted_data.supplier.name or ""
+    target_divider_id = ledger_db.find_best_matching_divider(target_book_id, supplier_name)
+
+    conn.execute("UPDATE ledger_documents SET book_id=?, divider_id=? WHERE id=?",
+                 (target_book_id, target_divider_id, doc_id))
+
+    # מחיקת ספר + חברה ישנים אם ריקים
+    old_book_id = doc["book_id"]
+    remaining = conn.execute("SELECT COUNT(*) FROM ledger_documents WHERE book_id=?",
+                              (old_book_id,)).fetchone()[0]
+    company_deleted = False
+    if remaining == 0:
+        conn.execute("DELETE FROM ledger_dividers WHERE book_id=?", (old_book_id,))
+        conn.execute("DELETE FROM ledger_books WHERE id=?", (old_book_id,))
+        books_left = conn.execute("SELECT COUNT(*) FROM ledger_books WHERE company_id=?",
+                                   (old_company_id,)).fetchone()[0]
+        if books_left == 0:
+            conn.execute("DELETE FROM ledger_companies WHERE id=?", (old_company_id,))
+            company_deleted = True
+    conn.commit()
+
+    target_company = conn.execute("SELECT name FROM ledger_companies WHERE id=?",
+                                   (target_company_id,)).fetchone()
+    div_name = ""
+    if target_divider_id:
+        div = conn.execute("SELECT name FROM ledger_dividers WHERE id=?",
+                            (target_divider_id,)).fetchone()
+        div_name = dict(div)["name"] if div else ""
+    conn.close()
+    return {"ok": True, "doc_id": doc_id,
+            "to_company": dict(target_company)["name"] if target_company else target_company_id,
+            "divider": div_name or "ללא חוצץ",
+            "old_company_deleted": company_deleted}
+
+
 @app.get("/api/debug/fix-divider-doc2-xK9m2026-done")
 async def fix_divider_doc2():
     """חד-פעמי: שיוך מסמך 2 לחוצץ 'חניה מקבוצה אורבנית בע\"מ' — חיפוש גלובלי."""
