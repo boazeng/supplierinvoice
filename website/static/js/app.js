@@ -143,6 +143,11 @@ const app = {
                 ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${inv.priority_invoice_id}</div>`
                 : '';
 
+            const statusCell = inv.status === 'pending_filing'
+                ? `<button class="btn btn-success btn-sm" style="font-size:0.8rem;padding:4px 10px"
+                      onclick="event.stopPropagation(); app.fileById('${inv.id}')">תייק בספרי הנהלת חשבונות</button>`
+                : `<span class="status-badge status-${inv.status}">${statusLabels[inv.status] || inv.status}</span>`;
+
             return `
                 <tr onclick="app.openInvoice('${inv.id}')">
                     <td>${supplierName}</td>
@@ -151,7 +156,7 @@ const app = {
                     <td class="col-amount">${fmt(afterVat)}</td>
                     <td>${date}</td>
                     <td style="text-align:center">${extractBox(inv.extraction_ok)}</td>
-                    <td><span class="status-badge status-${inv.status}">${statusLabels[inv.status] || inv.status}</span></td>
+                    <td>${statusCell}</td>
                     <td><button class="btn-delete-row" title="מחק חשבונית" onclick="event.stopPropagation(); app.deleteInvoiceById('${inv.id}')">🗑</button></td>
                 </tr>
             `;
@@ -910,6 +915,24 @@ const app = {
         } finally {
             btn.disabled = false;
             btn.textContent = '🔄 פענוח חוזר';
+        }
+    },
+
+    // === תיוק ישיר מהרשימה ===
+    async fileById(invoiceId) {
+        try {
+            const res = await fetch(`/api/invoices/${invoiceId}/file-to-ledger`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) {
+                this.showToast(data.detail || 'שגיאה בתיוק', 'error');
+                return;
+            }
+            const companyLabel = data.company_name || data.branch;
+            const dividerLabel = data.divider_name ? ` / ${data.divider_name}` : '';
+            this.showToast(`תויק — ${companyLabel} / ${data.year}${dividerLabel}`, 'success');
+            this.loadInvoices();
+        } catch (err) {
+            this.showToast('שגיאת תקשורת: ' + (err.message || err), 'error');
         }
     },
 
