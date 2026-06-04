@@ -890,6 +890,40 @@ async def move_doc_to_company(request: Request):
 
 
 
+@app.get("/api/debug/ledger-state-xK9m")
+async def ledger_state():
+    """מידע על החברות, ספרים, חוצצים והמסמך האחרון שתויק."""
+    conn = ledger_db._conn()
+    companies = conn.execute(
+        "SELECT c.id, c.name, COUNT(d.id) AS doc_count "
+        "FROM ledger_companies c "
+        "LEFT JOIN ledger_books b ON b.company_id = c.id "
+        "LEFT JOIN ledger_documents d ON d.book_id = b.id "
+        "GROUP BY c.id ORDER BY c.id"
+    ).fetchall()
+    dividers = conn.execute(
+        "SELECT div.id, div.name AS div_name, b.year, c.name AS company "
+        "FROM ledger_dividers div "
+        "JOIN ledger_books b ON b.id = div.book_id "
+        "JOIN ledger_companies c ON c.id = b.company_id"
+    ).fetchall()
+    last_doc = conn.execute("""
+        SELECT d.id, d.title, d.invoice_id, b.year, c.id AS cid, c.name AS company,
+               div.name AS divider
+        FROM ledger_documents d
+        JOIN ledger_books b ON b.id = d.book_id
+        JOIN ledger_companies c ON c.id = b.company_id
+        LEFT JOIN ledger_dividers div ON div.id = d.divider_id
+        ORDER BY d.id DESC LIMIT 3
+    """).fetchall()
+    conn.close()
+    return {
+        "companies": [dict(r) for r in companies],
+        "dividers": [dict(r) for r in dividers],
+        "last_docs": [dict(r) for r in last_doc],
+    }
+
+
 @app.get("/api/debug/fix-divider-doc2-xK9m2026-done")
 async def fix_divider_doc2():
     """חד-פעמי: שיוך מסמך 2 לחוצץ 'חניה מקבוצה אורבנית בע\"מ' — חיפוש גלובלי."""
