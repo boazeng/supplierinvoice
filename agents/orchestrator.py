@@ -37,12 +37,14 @@ def enrich_invoice_from_db(invoice: Invoice) -> None:
                 data.supplier.tax_id_type = match["tax_id_type"]
             if match.get("address"):
                 data.supplier.address = match["address"]
-            # חשבון הוצאות שנשמר לספק בעבר — אם השדה עוד ריק, נטען מהטבלה
-            if not data.expense_account:
-                saved = companies_db.get_supplier_expense_account(match["priority_code"])
-                if saved:
-                    data.expense_account = saved
-                    logger.info("חשבון הוצאות נטען מהיסטוריה: %s", saved)
+            # חשבון הוצאות: DB גובר תמיד. אם אין ב-DB — מנקים הצעת AI (יש למלא ידנית)
+            saved = companies_db.get_supplier_expense_account(match["priority_code"])
+            if saved:
+                data.expense_account = saved
+                logger.info("חשבון הוצאות נטען מהיסטוריה: %s", saved)
+            else:
+                data.expense_account = ""
+                logger.info("חשבון הוצאות לא נשמר לספק %s — נאפס (יש להזין ידנית)", match["priority_code"])
 
     # העשרת לקוח — בחשבונית ספק הלקוח הוא תמיד אחת מ"החברות שלנו"
     # (תת-חברה / COMPANIES). מאתרים אותו בטבלת branches לפי ח.פ, ובהיעדר
