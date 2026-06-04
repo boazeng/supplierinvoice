@@ -283,7 +283,7 @@ const app = {
             <div class="data-section-card card-supplier">
                 <h4 class="section-header" style="color:var(--accent)">📦 ספק ${supMatch}</h4>
                 <div class="data-row">
-                    <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('supplier.name', d.supplier?.name)}</div>
+                    <div class="data-field"><span class="label">שם</span>${ef('supplier.name', d.supplier?.name)}</div>
                     <div class="data-field"><span class="label">${supTax}</span>${ef('supplier.tax_id', d.supplier?.tax_id)}</div>
                     <div class="data-field"><span class="label">פריורטי</span>${ef('supplier.priority_supplier_code', d.supplier?.priority_supplier_code)}</div>
                 </div>
@@ -292,7 +292,7 @@ const app = {
             <div class="data-section-card card-customer">
                 <h4 class="section-header" style="color:#1e40af">🏢 לקוח ${custMatch}</h4>
                 <div class="data-row">
-                    <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('customer.name', d.customer?.name)}</div>
+                    <div class="data-field"><span class="label">שם</span>${ef('customer.name', d.customer?.name)}</div>
                     <div class="data-field"><span class="label">${custTax}</span>${ef('customer.tax_id', d.customer?.tax_id)}</div>
                     <div class="data-field"><span class="label">סניף</span>${efAc('customer.branch', d.customer?.branch, '/api/db/branches/search')}</div>
                 </div>
