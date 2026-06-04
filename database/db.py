@@ -302,6 +302,15 @@ def get_all_branches() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_branch_by_code(branch_code: str) -> Optional[dict]:
+    """מחזיר סניף לפי קוד סניף."""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM branches WHERE branch_code = ?",
+                       (branch_code.strip(),)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 # --- חשבון הוצאות לפי ספק (נלמד מהקלדות) ---
 
 def get_supplier_expense_account(supplier_priority_code: str) -> Optional[str]:

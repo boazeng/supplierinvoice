@@ -643,14 +643,15 @@ async def file_invoice_to_ledger(invoice_id: str):
         raise HTTPException(status_code=400, detail="ניתן לתייק רק חשבוניות בסטטוס 'ממתין לתיוק'")
 
     d = invoice.extracted_data
-    branch = (d.customer.branch if d else "") or ""
+    branch_code = (d.customer.branch if d else "") or ""
     customer_name = (d.customer.name if d else "") or ""
-    # שם החברה: שם לקוח + קוד סניף (אם קיים)
-    base_name = customer_name or branch or "כללי"
-    if branch and customer_name and branch not in customer_name:
-        company_name = re.sub(r'[\\/:*?"<>|]', '_', f"{customer_name} - {branch}")
-    else:
-        company_name = re.sub(r'[\\/:*?"<>|]', '_', base_name)
+
+    # שם הסניף מ-Priority לפי קוד הסניף — שם זה ישמש לחיפוש חוצץ
+    branch_record = companies_db.get_branch_by_code(branch_code) if branch_code else None
+    branch_name = branch_record["name"] if branch_record else customer_name
+
+    # שם החברה לחיפוש — שם הלקוח שחולץ
+    company_name = re.sub(r'[\\/:*?"<>|]', '_', customer_name or branch_name or "כללי")
     supplier_name = re.sub(r'[\\/:*?"<>|]', '_', (d.supplier.name if d else "") or "ספק")
     invoice_num = re.sub(r'[\\/:*?"<>|]', '_', (d.invoice_number if d else "") or invoice_id[:8])
     invoice_date = (d.invoice_date if d else "") or date_cls.today().isoformat()
@@ -667,8 +668,8 @@ async def file_invoice_to_ledger(invoice_id: str):
             detail=f"לא נמצאה חברה מתאימה לשם: '{company_name}'. פתחי חברה חדשה בספרי הנהלת חשבונות ונסי שוב."
         )
     book_id = ledger_db.find_or_create_book(company_id, year)
-    # חיפוש חוצץ קיים בלבד — לעולם לא יוצרים חוצץ חדש אוטומטית
-    divider_id = ledger_db.find_best_matching_divider(book_id, supplier_name)
+    # חיפוש חוצץ לפי שם הסניף מ-Priority (מדויק יותר מהספק)
+    divider_id = ledger_db.find_best_matching_divider(book_id, branch_name)
 
     ext = Path(invoice.file_path).suffix.lower()
     filename = f"{supplier_name}_{invoice_num}{ext}"
