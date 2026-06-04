@@ -314,6 +314,42 @@ async function main() {
 
   await withTimeout(new Promise((res, rej) => form.endCurrentForm(false, res, rej)), 15000, 'endForm').catch(() => {});
 
+  // צירוף קובץ לתנועת יומן (FNCTRANS) — אחרי CLOSEPRINTPIV יש FNCNUM
+  if (filePath && fs.existsSync(filePath) && fncnum && !isTempIvnum(ivnumFinal)) {
+    process.stderr.write(`Attaching file to FNCTRANS ${fncnum}...\n`);
+    try {
+      const journalForm = await withTimeout(
+        new Promise((res, rej) => priority.formStartEx(
+          'FNCTRANS',
+          makeMessageHandler('FNCTRANS'),
+          null,
+          company, 1, { zoomValue: fncnum }, res, rej
+        )),
+        30000, 'formStartEx FNCTRANS'
+      );
+      const jSub = await withTimeout(
+        new Promise((res, rej) => journalForm.startSubForm(
+          'EXTFILES', makeMessageHandler('FNCTRANS.EXTFILES'), null, res, rej
+        )),
+        20000, 'startSubForm FNCTRANS.EXTFILES'
+      );
+      await withTimeout(new Promise((res, rej) => jSub.newRow(res, rej)), 10000, 'newRow FNCTRANS');
+      const jExt  = path.extname(filePath).toLowerCase().replace('.', '');
+      const jMime = jExt === 'pdf' ? 'application/pdf' : `image/${jExt}`;
+      const jData = `data:${jMime};base64,` + fs.readFileSync(filePath).toString('base64');
+      await withTimeout(
+        new Promise((res, rej) => jSub.uploadDataUrl(jData, jExt, () => {}, res, rej)),
+        60000, 'uploadDataUrl FNCTRANS'
+      );
+      await withTimeout(new Promise((res, rej) => jSub.saveRow(false, res, rej)), 15000, 'saveRow FNCTRANS');
+      await withTimeout(new Promise((res, rej) => jSub.endCurrentForm(false, res, rej)), 15000, 'endSubForm FNCTRANS');
+      await withTimeout(new Promise((res, rej) => journalForm.endCurrentForm(false, res, rej)), 15000, 'endForm FNCTRANS');
+      process.stderr.write(`File attached to FNCTRANS ${fncnum}\n`);
+    } catch (e) {
+      process.stderr.write(`FNCTRANS EXTFILES attach failed (continuing): ${e.message}\n`);
+    }
+  }
+
   // החשבונית נסגרה אם ה-IVNUM הוא כבר מספר סופי (לא T)
   if (!isTempIvnum(ivnumFinal) && ivnumFinal) {
     console.log(JSON.stringify({ ok: true, fncnum, ivnum: ivnumFinal }));
