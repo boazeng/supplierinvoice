@@ -344,25 +344,42 @@ def set_supplier_expense_account(supplier_priority_code: str, expense_account: s
 
 # --- חשבונות GL (מסונכרנים מפריורטי) ---
 
-def search_accounts(q: str, limit: int = 15) -> list[dict]:
-    """חיפוש חשבון לפי קוד או שם."""
+def _add_account_filters(conditions: list, params: list, branch: str, account_type: str) -> None:
+    """מוסיף תנאי סינון לפי סניף וסוג חשבון (helper פנימי)."""
+    if branch:
+        conditions.append("account_code LIKE ?")
+        params.append(f"%-{branch}")
+    if account_type == "expense":
+        conditions.append("(account_code LIKE '5%' OR account_code LIKE '6%')")
+    elif account_type == "supplier":
+        conditions.append("account_code LIKE '4%'")
+
+
+def search_accounts(q: str, limit: int = 15, branch: str = "", account_type: str = "") -> list[dict]:
+    """חיפוש חשבון לפי קוד או שם, עם סינון אופציונלי לפי סניף וסוג."""
     conn = get_connection()
+    conditions = ["(account_code LIKE ? OR account_name LIKE ?)"]
+    params: list = [f"{q}%", f"%{q}%"]
+    _add_account_filters(conditions, params, branch, account_type)
+    where = " AND ".join(conditions)
     rows = conn.execute(
-        """SELECT account_code, account_name FROM accounts
-           WHERE account_code LIKE ? OR account_name LIKE ?
-           ORDER BY account_code LIMIT ?""",
-        (f"{q}%", f"%{q}%", limit),
+        f"SELECT account_code, account_name FROM accounts WHERE {where} ORDER BY account_code LIMIT ?",
+        params + [limit],
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def get_all_accounts(limit: int = 200) -> list[dict]:
-    """מחזיר את כל החשבונות (עד limit)."""
+def get_all_accounts(limit: int = 200, branch: str = "", account_type: str = "") -> list[dict]:
+    """מחזיר את כל החשבונות (עד limit), עם סינון אופציונלי לפי סניף וסוג."""
     conn = get_connection()
+    conditions: list[str] = []
+    params: list = []
+    _add_account_filters(conditions, params, branch, account_type)
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     rows = conn.execute(
-        "SELECT account_code, account_name FROM accounts ORDER BY account_code LIMIT ?",
-        (limit,),
+        f"SELECT account_code, account_name FROM accounts {where} ORDER BY account_code LIMIT ?",
+        params + [limit],
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]

@@ -1217,11 +1217,17 @@ async def db_stats():
 
 
 @app.get("/api/db/accounts/search")
-async def search_accounts_api(q: str = Query(default="")):
+async def search_accounts_api(
+    q: str = Query(default=""),
+    branch: str = Query(default=""),
+    account_type: str = Query(default=""),
+):
     """חיפוש חשבון GL לפי קוד או שם. q ריק = כל החשבונות (עד 200).
+    branch — מסנן לפי סיומת סניף (למשל '110'). account_type — 'expense' או 'supplier'.
     אם ה-DB ריק — מסנכרן מפריורטי תחילה."""
     q = q.strip()
-    # אם ה-DB ריק — נסנכרן מפריורטי ונחזיר תוצאות
+    branch = branch.strip()
+    account_type = account_type.strip()
     if companies_db.get_accounts_count() == 0:
         try:
             from database.sync import sync_accounts
@@ -1230,7 +1236,10 @@ async def search_accounts_api(q: str = Query(default="")):
             await client.close()
         except Exception as e:
             logger.warning("לא ניתן לסנכרן חשבונות: %s", e)
-    results = companies_db.search_accounts(q, limit=200) if q else companies_db.get_all_accounts(limit=200)
+    if q:
+        results = companies_db.search_accounts(q, limit=200, branch=branch, account_type=account_type)
+    else:
+        results = companies_db.get_all_accounts(limit=200, branch=branch, account_type=account_type)
     return {"results": results}
 
 
