@@ -114,6 +114,44 @@ def find_or_create_company(name: str) -> int:
     return cid
 
 
+def find_best_matching_company(name: str) -> Optional[int]:
+    """מוצא חברה קיימת שמתאימה לשם — לעולם לא יוצר חדש.
+    מחזיר None אם אין חברה מתאימה."""
+    conn = _conn()
+    companies = conn.execute("SELECT id, name FROM ledger_companies ORDER BY id").fetchall()
+    conn.close()
+    if not companies:
+        return None
+
+    def normalize(s: str) -> str:
+        return (s.strip().lower()
+                .replace("'", "").replace('"', "")
+                .replace("-", " ").replace("_", " ")
+                .replace("בע מ", "בעמ").replace("בעמ", ""))
+
+    name_norm = normalize(name)
+    name_words = set(w for w in name_norm.split() if len(w) > 1)
+
+    best_id = None
+    best_score = 0.0
+
+    for comp in companies:
+        comp_norm = normalize(comp["name"])
+        comp_words = set(w for w in comp_norm.split() if len(w) > 1)
+
+        if name_words and comp_words:
+            common = name_words & comp_words
+            score = len(common) / max(len(name_words), len(comp_words))
+        else:
+            score = 0.5 if name_norm in comp_norm or comp_norm in name_norm else 0.0
+
+        if score > best_score:
+            best_score = score
+            best_id = comp["id"]
+
+    return best_id if best_score >= 0.3 else None
+
+
 def get_company(company_id: int) -> Optional[dict]:
     conn = _conn()
     row = conn.execute("SELECT * FROM ledger_companies WHERE id = ?", (company_id,)).fetchone()

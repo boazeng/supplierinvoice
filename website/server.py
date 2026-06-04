@@ -659,7 +659,13 @@ async def file_invoice_to_ledger(invoice_id: str):
     except (ValueError, TypeError):
         year = date_cls.today().year
 
-    company_id = ledger_db.find_or_create_company(company_name)
+    # חיפוש חברה קיימת בלבד — לא יוצרים חברה חדשה אוטומטית
+    company_id = ledger_db.find_best_matching_company(company_name)
+    if not company_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"לא נמצאה חברה מתאימה לשם: '{company_name}'. פתחי חברה חדשה בספרי הנהלת חשבונות ונסי שוב."
+        )
     book_id = ledger_db.find_or_create_book(company_id, year)
     # חיפוש חוצץ קיים בלבד — לעולם לא יוצרים חוצץ חדש אוטומטית
     divider_id = ledger_db.find_best_matching_divider(book_id, supplier_name)
