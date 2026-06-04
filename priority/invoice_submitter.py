@@ -11,26 +11,49 @@ from tools.invoice_store import InvoiceStore
 logger = logging.getLogger("פריורטי.קליטה")
 
 
-def _build_priority_payload(data: InvoiceData) -> dict:
-    """בונה את ה-payload לקליטה ב-PINVOICES לפי מבנה OData של Priority."""
-    if data.lines:
-        pdes = "; ".join(ln.description for ln in data.lines if ln.description)[:100]
-    else:
-        pdes = data.supplier.name or "חשבונית ספק"
+def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
+    """מחלץ קוד ספק ופריטים מפקודת היומן הנערכת.
+    מחזיר (supplier_code, items) כאשר items הם PINVOICEITEMS_SUBFORM."""
+    jl = getattr(data, 'journal_lines', None) or []
+    debit_rows  = [l for l in jl if l.get('type') == 'debit']
+    credit_rows = [l for l in jl if l.get('type') == 'credit']
 
-    item = {
-        "PARTNAME": "000",
-        "PDES": pdes,
-        "TQUANT": 1,
-        "PRICE": data.subtotal,
-    }
+    supplier_code = (credit_rows[0].get('account', '') if credit_rows else '') \
+        or data.supplier.priority_supplier_code
+
+    if debit_rows:
+        items = [
+            {
+                "PARTNAME": "000",
+                "PDES": (ln.get('description') or data.supplier.name or "חשבונית ספק")[:100],
+                "TQUANT": 1,
+                "PRICE": float(ln.get('debit', 0)),
+            }
+            for ln in debit_rows
+        ]
+    else:
+        # אין שורות יומן — fallback לנתוני פענוח
+        pdes = ("; ".join(l.description for l in data.lines if l.description)[:100]
+                if data.lines else data.supplier.name or "חשבונית ספק")
+        items = [{"PARTNAME": "000", "PDES": pdes, "TQUANT": 1, "PRICE": data.subtotal}]
+
+    return supplier_code, items
+
+
+def _build_priority_payload(data: InvoiceData) -> dict:
+    """בונה את ה-payload לקליטה ב-PINVOICES.
+    מספר החשבונית, תאריך, סניף והקצאה — מהפענוח.
+    ספק וסכומים — מפקודת היומן אם קיימת, אחרת מהפענוח."""
+    supplier_code, items = _extract_journal_fields(data)
+    pdes = items[0]["PDES"] if items else (data.supplier.name or "חשבונית ספק")
+
     payload = {
         "DEBIT": "D",
         "BOOKNUM": data.invoice_number,
         "IVDATE": data.invoice_date,
-        "SUPNAME": data.supplier.priority_supplier_code,
+        "SUPNAME": supplier_code,
         "DETAILS": pdes,
-        "PINVOICEITEMS_SUBFORM": [item],
+        "PINVOICEITEMS_SUBFORM": items,
     }
 
     if data.customer.branch:
@@ -152,16 +175,15 @@ async def submit_invoice_odata_only(
     """
     if not invoice.extracted_data:
         raise ValueError("אין נתונים מנותחים לחשבונית")
-    if not invoice.extracted_data.supplier.priority_supplier_code:
-        raise ValueError("לא נמצא קוד ספק בפריורטי — לא ניתן לקלוט")
     if not invoice.extracted_data.invoice_number:
         raise ValueError("מספר חשבונית חסר — יש לערוך ולהזין מספר חשבונית לפני הקליטה")
 
-    logger.info(
-        "שלח OData בלבד — חשבונית %s ספק %s",
-        invoice.id,
-        invoice.extracted_data.supplier.priority_supplier_code,
-    )
+    # קוד ספק: עדיפות לשורת הזכות בפקודת יומן, fallback לפענוח
+    supplier_code, _ = _extract_journal_fields(invoice.extracted_data)
+    if not supplier_code:
+        raise ValueError("לא נמצא קוד ספק — יש למלא את חשבון הספק בפקודת היומן")
+
+    logger.info("שלח OData בלבד — חשבונית %s ספק %s", invoice.id, supplier_code)
 
     payload = _build_priority_payload(invoice.extracted_data)
 
