@@ -285,8 +285,6 @@ const app = {
                 <div class="data-row">
                     <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('supplier.name', d.supplier?.name)}</div>
                     <div class="data-field"><span class="label">${supTax}</span>${ef('supplier.tax_id', d.supplier?.tax_id)}</div>
-                </div>
-                <div class="data-row">
                     <div class="data-field"><span class="label">פריורטי</span>${ef('supplier.priority_supplier_code', d.supplier?.priority_supplier_code)}</div>
                 </div>
             </div>
@@ -296,9 +294,6 @@ const app = {
                 <div class="data-row">
                     <div class="data-field" style="flex:2"><span class="label">שם</span>${ef('customer.name', d.customer?.name)}</div>
                     <div class="data-field"><span class="label">${custTax}</span>${ef('customer.tax_id', d.customer?.tax_id)}</div>
-                </div>
-                <div class="data-row">
-                    <div class="data-field"><span class="label">פריורטי</span>${ef('customer.priority_customer_code', d.customer?.priority_customer_code)}</div>
                     <div class="data-field"><span class="label">סניף</span>${efAc('customer.branch', d.customer?.branch, '/api/db/branches/search')}</div>
                 </div>
             </div>
@@ -356,7 +351,6 @@ const app = {
             </div>`;
         }
 
-        html += `<div style="font-size:0.82rem;color:var(--text-muted);padding:2px 4px 6px">רמת ביטחון: ${Math.round((d.confidence_score || 0) * 100)}%</div>`;
 
         dataDiv.innerHTML = html;
 
