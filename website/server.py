@@ -631,6 +631,21 @@ async def update_invoice_field(invoice_id: str, body: dict = {}):
         raise HTTPException(status_code=400, detail=f"שדה לא קיים: {field}")
 
 
+@app.post("/api/invoices/{invoice_id}/journal-lines")
+async def update_journal_lines(invoice_id: str, body: dict = {}):
+    """שמירת שורות פקודת יומן שנערכו ידנית."""
+    invoice = store.get(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+    if not invoice.extracted_data:
+        raise HTTPException(status_code=400, detail="אין נתונים מחולצים")
+    lines = body.get("lines", [])
+    invoice.extracted_data.journal_lines = lines
+    invoice.updated_at = datetime.now().isoformat()
+    store.save(invoice)
+    return {"ok": True, "count": len(lines)}
+
+
 @app.post("/api/invoices/{invoice_id}/file-to-ledger")
 async def file_invoice_to_ledger(invoice_id: str):
     """תיוק חשבונית בספרי הנהלת חשבונות — לפי סניף + שנת חשבונית."""

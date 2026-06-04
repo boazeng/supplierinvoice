@@ -100,6 +100,7 @@ class InvoiceStore:
                 currency=extracted.get("currency", "ILS"),
                 confidence_score=extracted.get("confidence_score", 0),
                 extraction_warnings=extracted.get("extraction_warnings", []),
+                journal_lines=extracted.get("journal_lines", []),
             )
 
         # מיגרציה — מיפוי סטטוסים ישנים למודל הסטטוסים החדש

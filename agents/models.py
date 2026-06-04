@@ -85,6 +85,7 @@ class InvoiceData:
     currency: str = "ILS"
     confidence_score: float = 0.0       # 0.0 - 1.0
     extraction_warnings: list[str] = field(default_factory=list)
+    journal_lines: list = field(default_factory=list)  # עריכת פקודת יומן ידנית
 
 
 @dataclass

@@ -8,6 +8,8 @@ const app = {
     isFullscreen: false,
     highlightDrag: null,  // state for drag/resize
     activeHighlight: 'supplier',  // 'supplier' | 'customer'
+    currentJournalLines: [],      // שורות פקודת יומן הנוכחיות
+    _journalInvId: null,          // id חשבונית שעליה מבוסס currentJournalLines
 
     // === אתחול ===
     init() {
@@ -404,125 +406,269 @@ const app = {
         this.currentInvoice = null;
     },
 
-    // תצוגה מקדימה של תנועת היומן שתיווצר בקליטה לפריורטי
+    // תצוגה מקדימה של תנועת היומן — ניתנת לעריכה מלאה
     renderTransactionPreview(invoice) {
         const box = document.getElementById('transaction-preview');
         if (!box) return;
-
         const d = invoice && invoice.extracted_data;
         if (!d) { box.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem">אין נתונים מחולצים</div>'; return; }
-
         const branch = ((d.customer && d.customer.branch) || '').trim();
+        this._initJournalLines(d, branch);
+        this._renderJournalTable(box, d, branch);
+    },
+
+    _initJournalLines(d, branch) {
+        // שורות שמורות מהשרת — עדיפות ראשונה
+        if (d.journal_lines && d.journal_lines.length > 0) {
+            this._journalInvId = this.currentInvoice && this.currentInvoice.id;
+            this.currentJournalLines = d.journal_lines.map(l => Object.assign({}, l));
+            return;
+        }
+        // שורות מקומיות מאותה חשבונית — שמור עריכות בתהליך
+        if (this._journalInvId === (this.currentInvoice && this.currentInvoice.id) &&
+                this.currentJournalLines && this.currentJournalLines.length > 0) {
+            return;
+        }
+        // בניה ראשונית מנתוני הפענוח
+        this._journalInvId = this.currentInvoice && this.currentInvoice.id;
+        const expAcc  = (d.expense_account || '').trim();
+        const vatAcc  = branch ? `205-2-${branch}` : '205-2';
+        const supAcc  = ((d.supplier && d.supplier.priority_supplier_code) || '').trim();
         const subtotal = parseFloat(d.subtotal) || 0;
-        const vat = parseFloat(d.vat_amount) || 0;
-        const total = parseFloat(d.total_amount) || 0;
-        const expenseAcc = (d.expense_account || '').trim();
-        const supplierAcc = ((d.supplier && d.supplier.priority_supplier_code) || '').trim();
-        const lines = Array.isArray(d.lines) ? d.lines.filter(l => l && (l.description || l.total_price)) : [];
+        const vat      = parseFloat(d.vat_amount) || 0;
+        const total    = parseFloat(d.total_amount) || 0;
+        const invLines = Array.isArray(d.lines) ? d.lines.filter(l => l && (l.description || l.total_price)) : [];
+        const lines = [];
+        if (invLines.length > 1) {
+            invLines.forEach((ln, i) => lines.push({
+                id: `exp_${i}`, type: 'debit', account: expAcc,
+                description: ln.description || `שורה ${i + 1}`,
+                debit: parseFloat(ln.total_price || ln.unit_price || 0), credit: 0,
+            }));
+        } else {
+            lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: 'הוצאות', debit: subtotal, credit: 0 });
+        }
+        if (vat > 0) {
+            lines.push({ id: 'vat', type: 'vat', account: vatAcc, description: 'מע"מ תשומות', debit: vat, credit: 0 });
+        }
+        lines.push({ id: 'sup', type: 'credit', account: supAcc, description: (d.supplier && d.supplier.name) || 'ספק', debit: 0, credit: total });
+        this.currentJournalLines = lines;
+    },
 
-        const money = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    _renderJournalTable(box, d, branch) {
+        const lines = this.currentJournalLines || [];
+        const money  = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const totDr  = lines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0);
+        const totCr  = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+        const balanced   = Math.abs(totDr - totCr) < 0.01;
+        const invTotal   = parseFloat(d.total_amount) || 0;
+        const totalOk    = Math.abs(totCr - invTotal)  < 0.01;
+        const drCount    = lines.filter(l => l.type === 'debit').length;
+        const epExp = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}&type=expense`;
+        const epSup = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}&type=supplier`;
 
-        const cellStyle = 'padding:7px 12px';
-        // שדה חשבון עם autocomplete — מסנן לפי סניף וסוג
-        const acInput = (path, val, type) => {
-            const ep = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}&type=${encodeURIComponent(type || '')}`;
-            return `<span class="ac-field" style="position:relative;display:inline-flex">
-            <input class="edit-field ac-input tx-acc-input" data-path="${path}" data-ep="${ep}"
-                value="${val}" placeholder="— חסר —" autocomplete="off" spellcheck="false"
-                style="width:130px;font-size:0.9rem;padding:3px 7px">
-            <ul class="ac-dd"></ul></span>`;
+        const rowHtml = (l, i) => {
+            const isDr = l.type === 'debit', isVat = l.type === 'vat', isCr = l.type === 'credit';
+            const ep   = isCr ? epSup : epExp;
+            const safeAcc  = (l.account  || '').replace(/"/g, '&quot;');
+            const safeDesc = (l.description || '').replace(/"/g, '&quot;');
+
+            const accCell = (isDr || isCr)
+                ? `<span class="ac-field" style="position:relative;display:inline-flex;width:100%">
+                     <input class="edit-field ac-input jl-acc" data-jli="${i}" data-ep="${ep}"
+                       value="${safeAcc}" placeholder="— חסר —" autocomplete="off" spellcheck="false"
+                       style="width:100%;font-size:0.88rem;padding:3px 6px">
+                     <ul class="ac-dd"></ul></span>`
+                : `<span style="font-size:0.87rem;color:var(--text-secondary);padding:3px 0">${l.account || ''}</span>`;
+
+            const descCell = isDr
+                ? `<input class="edit-field jl-fld" data-jli="${i}" data-jlf="description"
+                     value="${safeDesc}" style="width:100%;font-size:0.88rem;padding:3px 6px">`
+                : `<span style="font-size:0.87rem;padding:3px 0">${l.description || ''}</span>`;
+
+            const drCell = (isDr || isVat)
+                ? `<input class="edit-field jl-fld" data-jli="${i}" data-jlf="debit" type="number" step="0.01" min="0"
+                     value="${parseFloat(l.debit || 0).toFixed(2)}"
+                     style="width:88px;font-size:0.88rem;padding:3px 6px;direction:ltr;text-align:left">`
+                : '';
+
+            const crCell = isCr
+                ? `<input class="edit-field jl-fld" data-jli="${i}" data-jlf="credit" type="number" step="0.01" min="0"
+                     value="${parseFloat(l.credit || 0).toFixed(2)}"
+                     style="width:88px;font-size:0.88rem;padding:3px 6px;direction:ltr;text-align:left">`
+                : '';
+
+            const delBtn = (isDr && drCount > 1)
+                ? `<button class="jl-del" data-jldel="${i}"
+                     style="background:none;border:none;cursor:pointer;color:var(--danger);padding:2px 5px;font-size:0.85rem" title="מחק שורה">✕</button>`
+                : '';
+
+            return `<tr>
+                <td style="padding:4px 6px">${accCell}</td>
+                <td style="padding:4px 6px">${descCell}</td>
+                <td style="padding:4px 6px;direction:ltr;text-align:left">${drCell}</td>
+                <td style="padding:4px 6px;direction:ltr;text-align:left">${crCell}</td>
+                <td style="padding:4px 2px;text-align:center;width:24px">${delBtn}</td>
+            </tr>`;
         };
 
-        // שדה סכום עריכה
-        const amtInput = (path, val) => `<input class="edit-field tx-amt-input" data-path="${path}"
-            value="${parseFloat(val) || 0}"
-            style="width:90px;font-size:0.9rem;padding:3px 7px;text-align:left;direction:ltr" type="number" step="0.01" min="0">`;
+        let warnHtml = '';
+        if (!branch) warnHtml = `<span class="jl-warn" style="color:var(--danger);font-size:0.82rem">⚠ לא זוהה סניף</span>`;
+        else if (!balanced) warnHtml = `<span class="jl-warn" style="color:var(--danger);font-size:0.82rem">⚠ לא מאוזן — חובה ₪${money(totDr)} זכות ₪${money(totCr)}</span>`;
+        else if (!totalOk) warnHtml = `<span class="jl-warn" style="color:var(--warning,#b45309);font-size:0.82rem">⚠ סה"כ שונה מחשבונית ₪${money(invTotal)}</span>`;
+        else warnHtml = `<span class="jl-warn" style="color:var(--success);font-size:0.82rem">✓ מאוזן</span>`;
 
-        // בניית שורות החובה — אם יש שורות חשבונית, נציג אותן; אחרת שורה אחת מסך
-        let debitRows = '';
-        let totalDebit = 0;
-
-        if (lines.length > 0) {
-            // שורה לכל פריט בחשבונית
-            lines.forEach((ln, i) => {
-                const amt = parseFloat(ln.total_price || ln.unit_price || 0);
-                totalDebit += amt;
-                const desc = ln.description || `שורה ${i + 1}`;
-                debitRows += `<tr>
-                    <td style="${cellStyle}">${acInput('expense_account', expenseAcc, 'expense')}</td>
-                    <td style="${cellStyle};max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc}">${desc}</td>
-                    <td style="${cellStyle};direction:ltr;text-align:left">₪${money(amt)}</td><td style="${cellStyle}"></td></tr>`;
-            });
-            // אם סכום שורות שונה מ-subtotal — נציג גם subtotal לעריכה
-            if (Math.abs(totalDebit - subtotal) > 0.01) {
-                debitRows += `<tr style="font-size:0.78rem;color:var(--text-secondary)">
-                    <td colspan="2">סכום שורות vs. סיכום: ${money(totalDebit)} / ${money(subtotal)}</td><td></td><td></td></tr>`;
-            }
-        } else {
-            // שורה אחת עם סכום ניתן לעריכה
-            totalDebit = subtotal;
-            debitRows = `<tr>
-                <td style="${cellStyle}">${acInput('expense_account', expenseAcc, 'expense')}</td>
-                <td style="${cellStyle}">הוצאות</td>
-                <td style="${cellStyle};direction:ltr;text-align:left">${amtInput('subtotal', subtotal)}</td><td style="${cellStyle}"></td></tr>`;
-        }
-
-        const vatAcc = branch ? `205-2-${branch}` : '205-2';
-        const vatRow = vat > 0 ? `<tr>
-            <td style="${cellStyle}">${vatAcc}</td>
-            <td style="${cellStyle}">מע"מ תשומות</td>
-            <td style="${cellStyle};direction:ltr;text-align:left">${amtInput('vat_amount', vat)}</td>
-            <td style="${cellStyle}"></td></tr>` : '';
-
-        const dr = (lines.length > 0 ? totalDebit : subtotal) + vat;
-        const cr = total;
-        const balanced = Math.abs(dr - cr) < 0.01;
-
-        let warn = '';
-        if (!branch) warn = '⚠ לא זוהה סניף ללקוח — קודי החשבון חסרים את סיומת הסניף.';
-        else if (!expenseAcc) warn = '⚠ לא הוזן חשבון הוצאות.';
-        else if (!supplierAcc) warn = '⚠ הספק לא זוהה בפריורטי.';
-
-        const tdS = `style="${cellStyle}"`;
         box.innerHTML = `
-            <div class="tx-card">
-                <div class="tx-card-header">
-                    📒 פקודת יומן
-                    <span class="tx-meta">סניף: ${branch || '—'}${lines.length > 0 ? ` · ${lines.length} שורות` : ''}</span>
-                    ${warn ? `<span style="color:var(--danger);font-size:0.82rem;margin-right:auto">${warn}</span>` : ''}
-                </div>
-                <table class="tx-table">
-                    <thead><tr>
-                        <th style="text-align:right">חשבון</th>
-                        <th style="text-align:right">תיאור</th>
-                        <th style="text-align:left;direction:ltr">חובה</th>
-                        <th style="text-align:left;direction:ltr">זכות</th>
-                    </tr></thead>
-                    <tbody>
-                        ${debitRows}
-                        ${vatRow}
-                        <tr>
-                            <td ${tdS}>${acInput('supplier.priority_supplier_code', supplierAcc, 'supplier')}</td>
-                            <td ${tdS}>${(d.supplier && d.supplier.name) || 'ספק'}</td>
-                            <td ${tdS}></td>
-                            <td ${tdS}>${amtInput('total_amount', total)}</td>
-                        </tr>
-                        <tr class="tx-total-row">
-                            <td ${tdS} colspan="2">סה"כ</td>
-                            <td ${tdS} style="${cellStyle};direction:ltr;text-align:left">₪${money(dr)}</td>
-                            <td ${tdS} style="${cellStyle};direction:ltr;text-align:left">₪${money(cr)}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="tx-card-footer" style="color:${balanced ? 'var(--success)' : 'var(--danger)'}">
-                    ${balanced ? '✓ מאוזן' : '⚠ לא מאוזן'}
-                </div>
-            </div>`;
+        <div class="tx-card">
+            <div class="tx-card-header" style="gap:8px;flex-wrap:wrap">
+                <span>📒 פקודת יומן</span>
+                <span class="tx-meta">סניף: ${branch || '—'}</span>
+                <span style="flex:1"></span>
+                ${warnHtml}
+                <button id="btn-add-jl" class="btn btn-secondary btn-sm"
+                  style="font-size:0.8rem;padding:3px 10px">＋ הוסף שורה</button>
+            </div>
+            <table class="tx-table" style="table-layout:fixed">
+                <colgroup>
+                    <col style="width:27%"><col style="width:31%"><col style="width:17%"><col style="width:17%"><col style="width:8%">
+                </colgroup>
+                <thead><tr>
+                    <th>חשבון</th><th>תיאור</th>
+                    <th style="direction:ltr;text-align:left">חובה</th>
+                    <th style="direction:ltr;text-align:left">זכות</th>
+                    <th></th>
+                </tr></thead>
+                <tbody>
+                    ${lines.map(rowHtml).join('')}
+                    <tr class="tx-total-row">
+                        <td colspan="2" style="padding:5px 6px">סה"כ</td>
+                        <td class="jl-tot-dr" style="padding:5px 6px;direction:ltr;text-align:left">₪${money(totDr)}</td>
+                        <td class="jl-tot-cr" style="padding:5px 6px;direction:ltr;text-align:left">₪${money(totCr)}</td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="tx-card-footer" style="color:${balanced && totalOk ? 'var(--success)' : 'var(--danger)'}">
+                ${balanced && totalOk ? '✓ מאוזן' : (balanced ? '⚠ שונה מסה"כ חשבונית' : '⚠ לא מאוזן')}
+            </div>
+        </div>`;
 
-        box.querySelectorAll('.edit-field').forEach(input => {
-            input.addEventListener('change', () => this.saveFieldEdit(input));
+        // הוסף שורה
+        box.querySelector('#btn-add-jl').addEventListener('click', () => {
+            const insertAt = this.currentJournalLines.findIndex(l => l.type !== 'debit');
+            const newLine  = { id: `exp_${Date.now()}`, type: 'debit', account: '', description: 'הוצאות', debit: 0, credit: 0 };
+            if (insertAt === -1) this.currentJournalLines.push(newLine);
+            else this.currentJournalLines.splice(insertAt, 0, newLine);
+            this._renderJournalTable(box, d, branch);
+            this.saveJournalLines();
         });
-        this._setupAcFields(box);
+
+        // מחק שורה
+        box.querySelectorAll('.jl-del').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.currentJournalLines.splice(parseInt(btn.dataset.jldel), 1);
+                this._renderJournalTable(box, d, branch);
+                this.saveJournalLines();
+            });
+        });
+
+        // עריכת שדות (תיאור, סכום) — עדכון ללא re-render
+        box.querySelectorAll('.jl-fld').forEach(input => {
+            input.addEventListener('change', () => {
+                const idx = parseInt(input.dataset.jli);
+                const fld = input.dataset.jlf;
+                const isNum = fld === 'debit' || fld === 'credit';
+                this.currentJournalLines[idx][fld] = isNum ? (parseFloat(input.value) || 0) : input.value;
+                this._updateJournalTotals(box, d);
+                this.saveJournalLines();
+            });
+        });
+
+        // autocomplete לשדות חשבון
+        box.querySelectorAll('.jl-acc').forEach(input => {
+            const dd = input.nextElementSibling;
+            let timer = null;
+            const pos = () => {
+                const r = input.getBoundingClientRect();
+                Object.assign(dd.style, { position: 'fixed', top: (r.bottom + 2) + 'px', left: r.left + 'px',
+                    width: Math.max(240, r.width) + 'px', right: 'auto', zIndex: '99999' });
+            };
+            const search = async (q, all = false) => {
+                if (!all && !q.trim()) { dd.style.display = 'none'; return; }
+                try {
+                    const sep = input.dataset.ep.includes('?') ? '&' : '?';
+                    const res  = await fetch(`${input.dataset.ep}${sep}q=${encodeURIComponent(q)}`);
+                    const data = await res.json();
+                    const items = data.results || [];
+                    if (!items.length) { dd.style.display = 'none'; return; }
+                    dd.innerHTML = items.map(it => {
+                        const code = it.account_code || '', name = it.account_name || '';
+                        return `<li data-val="${code.replace(/"/g,'&quot;')}">${name ? `${code} — ${name}` : code}</li>`;
+                    }).join('');
+                    pos(); dd.style.display = 'block';
+                } catch { dd.style.display = 'none'; }
+            };
+            input.addEventListener('input',  () => { clearTimeout(timer); timer = setTimeout(() => search(input.value), 250); });
+            input.addEventListener('focus',  () => search(input.value, true));
+            input.addEventListener('blur',   () => setTimeout(() => { dd.style.display = 'none'; }, 200));
+            dd.addEventListener('mousedown', e => {
+                e.preventDefault();
+                const li = e.target.closest('li');
+                if (!li) return;
+                const val = li.dataset.val;
+                input.value = val;
+                dd.style.display = 'none';
+                const idx = parseInt(input.dataset.jli);
+                this.currentJournalLines[idx].account = val;
+                // שמור גם ב-expense_account של הספק לזיכרון לטווח ארוך
+                if (this.currentJournalLines[idx].type === 'debit' && val) {
+                    fetch(`/api/invoices/${this.currentInvoice.id}/update-field`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ path: 'expense_account', value: val }),
+                    });
+                    if (this.currentInvoice.extracted_data) this.currentInvoice.extracted_data.expense_account = val;
+                }
+                this.saveJournalLines();
+            });
+        });
+    },
+
+    _updateJournalTotals(box, d) {
+        const lines  = this.currentJournalLines || [];
+        const money  = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const totDr  = lines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0);
+        const totCr  = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+        const bal    = Math.abs(totDr - totCr) < 0.01;
+        const invTot = parseFloat(d && d.total_amount) || 0;
+        const totOk  = Math.abs(totCr - invTot) < 0.01;
+        const drEl   = box.querySelector('.jl-tot-dr');
+        const crEl   = box.querySelector('.jl-tot-cr');
+        const warnEl = box.querySelector('.jl-warn');
+        const footEl = box.querySelector('.tx-card-footer');
+        if (drEl) drEl.textContent = `₪${money(totDr)}`;
+        if (crEl) crEl.textContent = `₪${money(totCr)}`;
+        if (warnEl) {
+            if (!bal) { warnEl.style.color = 'var(--danger)'; warnEl.textContent = `⚠ לא מאוזן — חובה ₪${money(totDr)} זכות ₪${money(totCr)}`; }
+            else if (!totOk) { warnEl.style.color = 'var(--warning,#b45309)'; warnEl.textContent = `⚠ סה"כ שונה מחשבונית ₪${money(invTot)}`; }
+            else { warnEl.style.color = 'var(--success)'; warnEl.textContent = '✓ מאוזן'; }
+        }
+        if (footEl) {
+            footEl.textContent = bal && totOk ? '✓ מאוזן' : (bal ? '⚠ שונה מסה"כ חשבונית' : '⚠ לא מאוזן');
+            footEl.style.color = bal && totOk ? 'var(--success)' : 'var(--danger)';
+        }
+    },
+
+    async saveJournalLines() {
+        if (!this.currentInvoice) return;
+        if (this.currentInvoice.extracted_data)
+            this.currentInvoice.extracted_data.journal_lines = this.currentJournalLines.slice();
+        try {
+            await fetch(`/api/invoices/${this.currentInvoice.id}/journal-lines`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lines: this.currentJournalLines }),
+            });
+        } catch {}
     },
 
     toggleFullscreen(forceOn = null) {
@@ -851,6 +997,9 @@ const app = {
 
     async reextractInvoice() {
         if (!this.currentInvoice) return;
+        // איפוס שורות יומן — פענוח חוזר יבנה אותן מחדש
+        this._journalInvId = null;
+        this.currentJournalLines = [];
 
         const cropCoords = this._getHighlightCoordsRelativeToImage('supplier');
         if (!cropCoords) {
@@ -961,6 +1110,24 @@ const app = {
 
     async approveInvoice() {
         if (!this.currentInvoice) return;
+
+        // ולידציה: פקודת יומן חייבת להיות מאוזנת לפני קליטה בפריורטי
+        const jLines = this.currentJournalLines;
+        if (jLines && jLines.length > 0) {
+            const money = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const totDr = jLines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0);
+            const totCr = jLines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+            if (Math.abs(totDr - totCr) > 0.01) {
+                this.showToast(`פקודת יומן לא מאוזנת — חובה ₪${money(totDr)} זכות ₪${money(totCr)}`, 'error');
+                return;
+            }
+            const invTot = parseFloat(this.currentInvoice.extracted_data && this.currentInvoice.extracted_data.total_amount) || 0;
+            if (invTot > 0 && Math.abs(totCr - invTot) > 0.51) {
+                const ok = confirm(`סה"כ פקודת יומן ₪${money(totCr)} שונה מסה"כ חשבונית ₪${money(invTot)}.\nלהמשיך בכל זאת?`);
+                if (!ok) return;
+            }
+        }
+
         const notes = document.getElementById('user-notes')?.value || '';
         const btn = document.getElementById('btn-submit');
 
