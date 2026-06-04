@@ -328,6 +328,7 @@ body {
 .status-pending_filing     { background: #2F8F5B1f; color: #2F8F5B; }
 .status-on_hold            { background: #9B948624; color: #706A60; }
 .status-cancelled          { background: #D64A2E18; color: #D64A2E; }
+.status-filed              { background: #6B748018; color: #4B5563; }
 
 /* === Modal === */
 .modal {

@@ -117,6 +117,7 @@ const app = {
             pending_filing: 'ממתין לתיוק',
             on_hold: 'בהמתנה',
             cancelled: 'בוטל',
+            filed: 'תויקה',
         };
 
         const fmt = (n) => n != null && n !== 0 ? `₪${Number(n).toLocaleString('he-IL', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
@@ -407,7 +408,6 @@ const app = {
         if (!d) { box.innerHTML = '<div style="color:var(--text-secondary);font-size:0.85rem">אין נתונים מחולצים</div>'; return; }
 
         const branch = ((d.customer && d.customer.branch) || '').trim();
-        const sfx = branch ? '-' + branch : '';
         const subtotal = parseFloat(d.subtotal) || 0;
         const vat = parseFloat(d.vat_amount) || 0;
         const total = parseFloat(d.total_amount) || 0;
@@ -418,12 +418,15 @@ const app = {
         const money = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         const cellStyle = 'padding:7px 12px';
-        // שדה חשבון עם autocomplete
-        const acInput = (path, val) => `<span class="ac-field" style="position:relative;display:inline-flex">
-            <input class="edit-field ac-input tx-acc-input" data-path="${path}" data-ep="/api/db/accounts/search"
+        // שדה חשבון עם autocomplete — מסנן לפי סניף וסוג
+        const acInput = (path, val, type) => {
+            const ep = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}&type=${encodeURIComponent(type || '')}`;
+            return `<span class="ac-field" style="position:relative;display:inline-flex">
+            <input class="edit-field ac-input tx-acc-input" data-path="${path}" data-ep="${ep}"
                 value="${val}" placeholder="— חסר —" autocomplete="off" spellcheck="false"
-                style="width:100px;font-size:0.9rem;padding:3px 7px">
-            <ul class="ac-dd"></ul></span>${sfx ? `<span style="font-size:0.85rem;color:var(--text-secondary);margin-right:4px"> -${branch}</span>` : ''}`;
+                style="width:130px;font-size:0.9rem;padding:3px 7px">
+            <ul class="ac-dd"></ul></span>`;
+        };
 
         // שדה סכום עריכה
         const amtInput = (path, val) => `<input class="edit-field tx-amt-input" data-path="${path}"
@@ -441,7 +444,7 @@ const app = {
                 totalDebit += amt;
                 const desc = ln.description || `שורה ${i + 1}`;
                 debitRows += `<tr>
-                    <td style="${cellStyle}">${acInput('expense_account', expenseAcc)}</td>
+                    <td style="${cellStyle}">${acInput('expense_account', expenseAcc, 'expense')}</td>
                     <td style="${cellStyle};max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc}">${desc}</td>
                     <td style="${cellStyle};direction:ltr;text-align:left">₪${money(amt)}</td><td style="${cellStyle}"></td></tr>`;
             });
@@ -454,13 +457,14 @@ const app = {
             // שורה אחת עם סכום ניתן לעריכה
             totalDebit = subtotal;
             debitRows = `<tr>
-                <td style="${cellStyle}">${acInput('expense_account', expenseAcc)}</td>
+                <td style="${cellStyle}">${acInput('expense_account', expenseAcc, 'expense')}</td>
                 <td style="${cellStyle}">הוצאות</td>
                 <td style="${cellStyle};direction:ltr;text-align:left">${amtInput('subtotal', subtotal)}</td><td style="${cellStyle}"></td></tr>`;
         }
 
+        const vatAcc = branch ? `205-2-${branch}` : '205-2';
         const vatRow = vat > 0 ? `<tr>
-            <td style="${cellStyle}">205-2${sfx}</td>
+            <td style="${cellStyle}">${vatAcc}</td>
             <td style="${cellStyle}">מע"מ תשומות</td>
             <td style="${cellStyle};direction:ltr;text-align:left">${amtInput('vat_amount', vat)}</td>
             <td style="${cellStyle}"></td></tr>` : '';
@@ -493,7 +497,7 @@ const app = {
                         ${debitRows}
                         ${vatRow}
                         <tr>
-                            <td ${tdS}>${acInput('supplier.priority_supplier_code', supplierAcc)}</td>
+                            <td ${tdS}>${acInput('supplier.priority_supplier_code', supplierAcc, 'supplier')}</td>
                             <td ${tdS}>${(d.supplier && d.supplier.name) || 'ספק'}</td>
                             <td ${tdS}></td>
                             <td ${tdS}>${amtInput('total_amount', total)}</td>
@@ -1208,7 +1212,8 @@ const app = {
             const search = async (q, showAll = false) => {
                 if (!showAll && !q.trim()) { dd.style.display = 'none'; return; }
                 try {
-                    const res = await fetch(`${input.dataset.ep}?q=${encodeURIComponent(q)}`);
+                    const sep = input.dataset.ep.includes('?') ? '&' : '?';
+                    const res = await fetch(`${input.dataset.ep}${sep}q=${encodeURIComponent(q)}`);
                     const data = await res.json();
                     const items = data.results || [];
                     if (!items.length) { dd.style.display = 'none'; return; }
