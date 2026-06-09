@@ -433,7 +433,8 @@ const app = {
         this._journalInvId = this.currentInvoice && this.currentInvoice.id;
         const expAcc  = (d.expense_account || '').trim();
         const vatAcc  = branch ? `205-2-${branch}` : '205-2';
-        const supAcc  = ((d.supplier && d.supplier.priority_supplier_code) || '').trim();
+        const supCode = ((d.supplier && d.supplier.priority_supplier_code) || '').trim();
+        const supAcc  = supCode && branch ? `${supCode}-${branch}` : supCode;
         const subtotal = parseFloat(d.subtotal) || 0;
         const vat      = parseFloat(d.vat_amount) || 0;
         const total    = parseFloat(d.total_amount) || 0;
@@ -471,12 +472,18 @@ const app = {
             const safeAcc  = (l.account  || '').replace(/"/g, '&quot;');
             const safeDesc = (l.description || '').replace(/"/g, '&quot;');
 
-            const accCell = (isDr || isCr)
+            // שורת חובה — dropdown עם autocomplete מחשבונות הסניף
+            // שורת זכות (ספק) — שדה טקסט פשוט (קוד ספק-סניף, לא בטבלת חשבונות)
+            const accCell = isDr
                 ? `<span class="ac-field" style="position:relative;display:inline-flex;width:100%">
                      <input class="edit-field ac-input jl-acc" data-jli="${i}" data-ep="${ep}"
                        value="${safeAcc}" placeholder="— חסר —" autocomplete="off" spellcheck="false"
                        style="width:100%;font-size:0.88rem;padding:3px 6px">
                      <ul class="ac-dd"></ul></span>`
+                : isCr
+                ? `<input class="edit-field jl-fld" data-jli="${i}" data-jlf="account"
+                     value="${safeAcc}" placeholder="קוד ספק-סניף"
+                     style="width:100%;font-size:0.88rem;padding:3px 6px">`
                 : `<span style="font-size:0.87rem;color:var(--text-secondary);padding:3px 0">${l.account || ''}</span>`;
 
             const descCell = isDr
