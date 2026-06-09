@@ -464,12 +464,10 @@ const app = {
         const invTotal   = parseFloat(d.total_amount) || 0;
         const totalOk    = Math.abs(totCr - invTotal)  < 0.01;
         const drCount    = lines.filter(l => l.type === 'debit').length;
-        const epExp = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}&type=expense`;
-        const epSup = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}&type=supplier`;
+        const ep = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}`;
 
         const rowHtml = (l, i) => {
             const isDr = l.type === 'debit', isVat = l.type === 'vat', isCr = l.type === 'credit';
-            const ep   = isCr ? epSup : epExp;
             const safeAcc  = (l.account  || '').replace(/"/g, '&quot;');
             const safeDesc = (l.description || '').replace(/"/g, '&quot;');
 

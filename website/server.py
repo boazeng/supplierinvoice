@@ -1252,9 +1252,9 @@ async def search_accounts_api(
         except Exception as e:
             logger.warning("לא ניתן לסנכרן חשבונות: %s", e)
     if q:
-        results = companies_db.search_accounts(q, limit=200, branch=branch, account_type=account_type)
+        results = companies_db.search_accounts(q, limit=500, branch=branch, account_type=account_type)
     else:
-        results = companies_db.get_all_accounts(limit=200, branch=branch, account_type=account_type)
+        results = companies_db.get_all_accounts(limit=500, branch=branch, account_type=account_type)
     return {"results": results}
 
 
