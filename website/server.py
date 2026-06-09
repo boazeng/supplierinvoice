@@ -1258,6 +1258,21 @@ async def search_accounts_api(
     return {"results": results}
 
 
+@app.get("/api/db/suppliers/journal-accounts")
+async def supplier_journal_accounts(branch: str = Query(default=""), q: str = Query(default="")):
+    """חשבונות ספקים בפורמט {קוד}-{סניף} לפקודת יומן."""
+    suppliers = companies_db.get_all(company_type='supplier')
+    q_lower = q.strip().lower()
+    results = []
+    for s in suppliers:
+        code = s.get('priority_code', '') or ''
+        name = s.get('name', '') or ''
+        acc_code = f"{code}-{branch}" if branch else code
+        if not q_lower or q_lower in acc_code.lower() or q_lower in name.lower():
+            results.append({"account_code": acc_code, "account_name": name})
+    return {"results": results[:500]}
+
+
 @app.get("/api/db/branches/search")
 async def search_branches_api(q: str = Query(..., min_length=1)):
     """חיפוש סניף לפי שם או ח.פ/ע.מ."""

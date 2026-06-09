@@ -465,25 +465,26 @@ const app = {
         const invTotal   = parseFloat(d.total_amount) || 0;
         const totalOk    = Math.abs(totCr - invTotal)  < 0.01;
         const drCount    = lines.filter(l => l.type === 'debit').length;
-        const ep = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}`;
+        const ep_exp = `/api/db/accounts/search`;
+        const ep_sup = `/api/db/suppliers/journal-accounts?branch=${encodeURIComponent(branch)}`;
 
         const rowHtml = (l, i) => {
             const isDr = l.type === 'debit', isVat = l.type === 'vat', isCr = l.type === 'credit';
             const safeAcc  = (l.account  || '').replace(/"/g, '&quot;');
             const safeDesc = (l.description || '').replace(/"/g, '&quot;');
 
-            // שורת חובה — dropdown עם autocomplete מחשבונות הסניף
-            // שורת זכות (ספק) — שדה טקסט פשוט (קוד ספק-סניף, לא בטבלת חשבונות)
             const accCell = isDr
                 ? `<span class="ac-field" style="position:relative;display:inline-flex;width:100%">
-                     <input class="edit-field ac-input jl-acc" data-jli="${i}" data-ep="${ep}"
+                     <input class="edit-field ac-input jl-acc" data-jli="${i}" data-ep="${ep_exp}"
                        value="${safeAcc}" placeholder="— חסר —" autocomplete="off" spellcheck="false"
                        style="width:100%;font-size:0.88rem;padding:3px 6px">
                      <ul class="ac-dd"></ul></span>`
                 : isCr
-                ? `<input class="edit-field jl-fld" data-jli="${i}" data-jlf="account"
-                     value="${safeAcc}" placeholder="קוד ספק-סניף"
-                     style="width:100%;font-size:0.88rem;padding:3px 6px">`
+                ? `<span class="ac-field" style="position:relative;display:inline-flex;width:100%">
+                     <input class="edit-field ac-input jl-acc" data-jli="${i}" data-ep="${ep_sup}"
+                       value="${safeAcc}" placeholder="קוד ספק-סניף" autocomplete="off" spellcheck="false"
+                       style="width:100%;font-size:0.88rem;padding:3px 6px">
+                     <ul class="ac-dd"></ul></span>`
                 : `<span style="font-size:0.87rem;color:var(--text-secondary);padding:3px 0">${l.account || ''}</span>`;
 
             const descCell = isDr
