@@ -13,13 +13,12 @@ logger = logging.getLogger("פריורטי.קליטה")
 
 def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
     """מחלץ קוד ספק ופריטים מפקודת היומן הנערכת.
-    מחזיר (supplier_code, items) כאשר items הם PINVOICEITEMS_SUBFORM."""
+    מחזיר (supplier_code, items) כאשר items הם PINVOICEITEMS_SUBFORM.
+    קוד הספק נלקח תמיד מנתוני הפענוח (priority_supplier_code), לא מפקודת היומן."""
     jl = getattr(data, 'journal_lines', None) or []
     debit_rows  = [l for l in jl if l.get('type') == 'debit']
-    credit_rows = [l for l in jl if l.get('type') == 'credit']
 
-    supplier_code = (credit_rows[0].get('account', '') if credit_rows else '') \
-        or data.supplier.priority_supplier_code
+    supplier_code = data.supplier.priority_supplier_code
 
     if debit_rows:
         items = [
@@ -178,10 +177,8 @@ async def submit_invoice_odata_only(
     if not invoice.extracted_data.invoice_number:
         raise ValueError("מספר חשבונית חסר — יש לערוך ולהזין מספר חשבונית לפני הקליטה")
 
-    # קוד ספק: עדיפות לשורת הזכות בפקודת יומן, fallback לפענוח
-    supplier_code, _ = _extract_journal_fields(invoice.extracted_data)
-    if not supplier_code:
-        raise ValueError("לא נמצא קוד ספק — יש למלא את חשבון הספק בפקודת היומן")
+    if not invoice.extracted_data.supplier.priority_supplier_code:
+        raise ValueError("לא נמצא קוד ספק בפריורטי — לא ניתן לקלוט")
 
     logger.info("שלח OData בלבד — חשבונית %s ספק %s", invoice.id, supplier_code)
 
