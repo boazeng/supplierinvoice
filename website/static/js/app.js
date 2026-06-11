@@ -182,7 +182,7 @@ const app = {
 
             const modal = document.getElementById('invoice-modal');
             modal.style.display = 'flex';
-            this.toggleFullscreen(true);
+            this.toggleFullscreen(false);
 
             // render אחרי שה-modal visible כדי שה-iframe יטען
             this.renderModal(invoice);
