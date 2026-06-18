@@ -356,9 +356,9 @@ body {
     position: relative;
     background: var(--bg-secondary);
     border-radius: var(--radius);
-    width: 80%;
-    max-width: 1100px;
-    height: 78vh;
+    width: 90%;
+    max-width: 1400px;
+    height: 88vh;
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
@@ -540,15 +540,34 @@ body {
 .data-pane {
     padding: 0;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: 1fr 1fr;
     min-height: 0;
 }
 
 .data-pane-scroll {
-    flex: 1;
     overflow-y: auto;
-    padding: 10px 12px 8px;
+    padding: 8px 12px 6px;
+    min-height: 0;
+    border-bottom: 2px solid var(--border);
+}
+
+#transaction-preview {
+    overflow-y: auto;
+    padding: 8px 10px;
+    min-height: 0;
+    background: var(--bg-secondary);
+}
+
+#transaction-preview .tx-card {
+    margin: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#transaction-preview .tx-table {
+    flex: 1;
 }
 
 .data-pane h3 {
@@ -818,6 +837,27 @@ body {
     to   { transform: translateX(0);     opacity: 1; }
 }
 
+/* === TACT logo inside modal === */
+.modal-tact-logo {
+    padding: 8px 2px 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+}
+
+.modal-tact-logo .tact-logo-letter {
+    font-size: 1.15rem;
+}
+
+.modal-tact-logo .tact-logo-dot {
+    width: 0.22rem;
+    height: 0.22rem;
+    margin: 0 0.2rem;
+}
+
+.modal-tact-logo .tact-logo-word {
+    font-size: 0.68rem;
+}
+
 /* === Data Section Cards (modal) === */
 .data-section-card {
     background: var(--bg-card);
@@ -825,7 +865,7 @@ body {
     border-right: 4px solid var(--accent);
     border-radius: 10px;
     overflow: hidden;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     box-shadow: 0 2px 6px rgba(28,27,25,0.06);
 }
 
