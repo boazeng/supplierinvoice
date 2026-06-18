@@ -1233,11 +1233,15 @@ const app = {
                 return;
             }
             this.showToast('נתוני הפענוח נמחקו', 'info');
+            // איפוס פקודת היומן שנשמרה בזיכרון
+            this.currentJournalLines = [];
+            this._journalInvId = null;
             // רענון המודל מהשרת
             const invRes = await fetch(`/api/invoices/${this.currentInvoice.id}`);
             if (invRes.ok) {
                 this.currentInvoice = await invRes.json();
                 this.renderModal(this.currentInvoice);
+                this.renderTransactionPreview(this.currentInvoice);
             }
             this.loadInvoices();
         } catch (err) {
