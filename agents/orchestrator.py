@@ -45,6 +45,14 @@ def enrich_invoice_from_db(invoice: Invoice) -> None:
             else:
                 data.expense_account = ""
                 logger.info("חשבון הוצאות לא נשמר לספק %s — נאפס (יש להזין ידנית)", match["priority_code"])
+            # סוג תנועה ושיעור מע"מ לפי FNCSUP.FNCPATNAME
+            fncpatname = companies_db.get_supplier_fncpatname(match["priority_code"])
+            data.fncpatname = fncpatname
+            if fncpatname == "2/3":
+                data.vat_type = "two_thirds"
+                logger.info("ספק %s — מע\"מ 2/3 (FNCPATNAME=2/3)", match["priority_code"])
+            else:
+                data.vat_type = "full"
 
     # העשרת לקוח — בחשבונית ספק הלקוח הוא תמיד אחת מ"החברות שלנו"
     # (תת-חברה / COMPANIES). מאתרים אותו בטבלת branches לפי ח.פ, ובהיעדר

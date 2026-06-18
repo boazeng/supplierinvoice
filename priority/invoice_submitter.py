@@ -68,6 +68,9 @@ def _build_priority_payload(data: InvoiceData) -> dict:
     if data.allocation_number:
         payload["SDINUMIT"] = data.allocation_number
 
+    if data.fncpatname:
+        payload["FNCPATNAME"] = data.fncpatname
+
     return payload
 
 

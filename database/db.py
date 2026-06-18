@@ -82,6 +82,14 @@ def init_db() -> None:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # טבלת הגדרות כספיות לספק — מסונכרנת מ-FNCSUP בפריורטי
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS supplier_financial_settings (
+            supplier_priority_code TEXT PRIMARY KEY,
+            fncpatname TEXT DEFAULT '',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     # טבלת חשבונות מפריורטי (מסונכרנת)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
@@ -412,6 +420,55 @@ def bulk_upsert_accounts(records: list[dict]) -> int:
 
 
 # --- סטטוס סנכרון ---
+
+# --- הגדרות כספיות לספק (מסונכרנות מ-FNCSUP) ---
+
+def get_supplier_fncpatname(supplier_priority_code: str) -> str:
+    """מחזיר את FNCPATNAME לספק, או '' אם לא נמצא."""
+    if not supplier_priority_code:
+        return ""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT fncpatname FROM supplier_financial_settings WHERE supplier_priority_code = ?",
+        (supplier_priority_code,),
+    ).fetchone()
+    conn.close()
+    return row["fncpatname"] if row else ""
+
+
+def set_supplier_fncpatname(supplier_priority_code: str, fncpatname: str) -> None:
+    """שומר/מעדכן FNCPATNAME לספק."""
+    if not supplier_priority_code:
+        return
+    conn = get_connection()
+    conn.execute("""
+        INSERT INTO supplier_financial_settings (supplier_priority_code, fncpatname, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(supplier_priority_code) DO UPDATE SET
+            fncpatname = excluded.fncpatname,
+            updated_at = CURRENT_TIMESTAMP
+    """, (supplier_priority_code, fncpatname or ""))
+    conn.commit()
+    conn.close()
+
+
+def bulk_upsert_supplier_financial_settings(records: list[dict]) -> int:
+    """עדכון מרובה של הגדרות כספיות — list of {supplier_priority_code, fncpatname}."""
+    conn = get_connection()
+    count = 0
+    for rec in records:
+        conn.execute("""
+            INSERT INTO supplier_financial_settings (supplier_priority_code, fncpatname, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(supplier_priority_code) DO UPDATE SET
+                fncpatname = excluded.fncpatname,
+                updated_at = CURRENT_TIMESTAMP
+        """, (rec["supplier_priority_code"], rec.get("fncpatname") or ""))
+        count += 1
+    conn.commit()
+    conn.close()
+    return count
+
 
 def update_sync_status(suppliers: int, customers: int, branches: int) -> None:
     """עדכון מועד סנכרון אחרון."""

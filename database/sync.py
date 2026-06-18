@@ -159,18 +159,43 @@ async def sync_accounts(client: PriorityClient) -> int:
     return count
 
 
+async def sync_fncsup(client: PriorityClient) -> int:
+    """מסנכרן הגדרות כספיות לספקים (FNCSUP.FNCPATNAME) מפריורטי."""
+    logger.info("מתחיל סנכרון FNCSUP...")
+    try:
+        result = await client._get("FNCSUP", params={
+            "$select": "SUPNAME,FNCPATNAME",
+            "$top": "2000",
+        })
+        if not result or not result.get("value"):
+            logger.warning("FNCSUP ריק או לא זמין — דילוג")
+            return 0
+        records = [
+            {"supplier_priority_code": r["SUPNAME"], "fncpatname": r.get("FNCPATNAME") or ""}
+            for r in result["value"] if r.get("SUPNAME")
+        ]
+        count = db.bulk_upsert_supplier_financial_settings(records)
+        logger.info("סנכרון FNCSUP הושלם — %d רשומות", count)
+        return count
+    except Exception as e:
+        logger.warning("FNCSUP sync נכשל (לא חובה): %s", e)
+        return 0
+
+
 async def sync_all() -> dict:
-    """סנכרון מלא — ספקים, לקוחות, תתי חברות, חשבונות."""
+    """סנכרון מלא — ספקים, לקוחות, תתי חברות, חשבונות, הגדרות כספיות."""
     client = PriorityClient()
     try:
         suppliers = await sync_suppliers(client)
         customers = await sync_customers(client)
         branches = await sync_branches(client)
         accounts = await sync_accounts(client)
+        fncsup = await sync_fncsup(client)
         db.update_sync_status(suppliers, customers, branches)
         stats = db.get_stats()
         logger.info("סנכרון מלא הושלם: %s", stats)
         return {"suppliers_synced": suppliers, "customers_synced": customers,
-                "branches_synced": branches, "accounts_synced": accounts, **stats}
+                "branches_synced": branches, "accounts_synced": accounts,
+                "fncsup_synced": fncsup, **stats}
     finally:
         await client.close()

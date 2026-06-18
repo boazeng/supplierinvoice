@@ -446,6 +446,9 @@ const app = {
         const vat      = parseFloat(d.vat_amount) || 0;
         const total    = parseFloat(d.total_amount) || 0;
         const invLines = Array.isArray(d.lines) ? d.lines.filter(l => l && (l.description || l.total_price)) : [];
+        const vatType  = d.vat_type || 'full';
+        const vatDed   = vatType === 'two_thirds' ? Math.round(vat * 2 / 3 * 100) / 100 : vat;
+        const vatNd    = vatType === 'two_thirds' ? Math.round((vat - vatDed) * 100) / 100 : 0;
         const lines = [];
         if (invLines.length > 1) {
             invLines.forEach((ln, i) => lines.push({
@@ -453,11 +456,14 @@ const app = {
                 description: ln.description || `שורה ${i + 1}`,
                 debit: parseFloat(ln.total_price || ln.unit_price || 0), credit: 0,
             }));
+            if (vatNd > 0) {
+                lines.push({ id: 'vat_nd', type: 'debit', account: expAcc, description: 'הוצאות רכב — מע"מ לא מוכר (1/3)', debit: vatNd, credit: 0 });
+            }
         } else {
-            lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: 'הוצאות', debit: subtotal, credit: 0 });
+            lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: 'הוצאות', debit: subtotal + vatNd, credit: 0 });
         }
-        if (vat > 0) {
-            lines.push({ id: 'vat', type: 'vat', account: vatAcc, description: 'מע"מ תשומות', debit: vat, credit: 0 });
+        if (vatDed > 0) {
+            lines.push({ id: 'vat', type: 'vat', account: vatAcc, description: vatType === 'two_thirds' ? 'מע"מ תשומות 2/3' : 'מע"מ תשומות', debit: vatDed, credit: 0 });
         }
         lines.push({ id: 'sup', type: 'credit', account: supAcc, description: (d.supplier && d.supplier.name) || 'ספק', debit: 0, credit: total });
         this.currentJournalLines = lines;
@@ -531,11 +537,18 @@ const app = {
         else if (!totalOk) warnHtml = `<span class="jl-warn" style="color:var(--warning,#b45309);font-size:0.82rem">⚠ סה"כ שונה מחשבונית ₪${money(invTotal)}</span>`;
         else warnHtml = `<span class="jl-warn" style="color:var(--success);font-size:0.82rem">✓ מאוזן</span>`;
 
+        const vatType  = d.vat_type || 'full';
+        const vatLabel = vatType === 'two_thirds' ? '2/3 — רכב' : 'חסמ — מע"מ מלא';
         box.innerHTML = `
         <div class="tx-card">
             <div class="tx-card-header" style="gap:8px;flex-wrap:wrap">
                 <span>📒 פקודת יומן</span>
                 <span class="tx-meta">סניף: ${branch || '—'}</span>
+                <select id="vat-type-sel" title="סוג תנועה / שיעור מע&quot;מ"
+                  style="font-size:0.82rem;padding:2px 6px;border:1px solid var(--border);border-radius:4px;cursor:pointer">
+                    <option value="full" ${vatType === 'full' ? 'selected' : ''}>חסמ — מע"מ מלא</option>
+                    <option value="two_thirds" ${vatType === 'two_thirds' ? 'selected' : ''}>2/3 — רכב</option>
+                </select>
                 <span style="flex:1"></span>
                 ${warnHtml}
                 <button id="btn-add-jl" class="btn btn-secondary btn-sm"
@@ -565,6 +578,36 @@ const app = {
                 ${balanced && totalOk ? '✓ מאוזן' : (balanced ? '⚠ שונה מסה"כ חשבונית' : '⚠ לא מאוזן')}
             </div>
         </div>`;
+
+        // שינוי סוג מע"מ / סוג תנועה
+        box.querySelector('#vat-type-sel').addEventListener('change', async (e) => {
+            const newVatType  = e.target.value;
+            const newFncpat   = newVatType === 'two_thirds' ? '2/3' : '';
+            d.vat_type    = newVatType;
+            d.fncpatname  = newFncpat;
+            if (this.currentInvoice && this.currentInvoice.extracted_data) {
+                this.currentInvoice.extracted_data.vat_type   = newVatType;
+                this.currentInvoice.extracted_data.fncpatname = newFncpat;
+            }
+            // שמור בשרת — vat_type ו-fncpatname
+            try {
+                await fetch(`/api/invoices/${this.currentInvoice.id}/update-field`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: 'vat_type', value: newVatType }),
+                });
+                await fetch(`/api/invoices/${this.currentInvoice.id}/update-field`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: 'fncpatname', value: newFncpat }),
+                });
+            } catch {}
+            // אפס שורות יומן שמורות ובנה מחדש
+            d.journal_lines = [];
+            this._journalInvId = null;
+            this.currentJournalLines = [];
+            this._initJournalLines(d, branch);
+            this._renderJournalTable(box, d, branch);
+            this.saveJournalLines();
+        });
 
         // הוסף שורה
         box.querySelector('#btn-add-jl').addEventListener('click', () => {
