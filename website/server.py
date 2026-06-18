@@ -573,6 +573,25 @@ async def reextract_invoice_api(invoice_id: str, body: dict = {}):
     }
 
 
+@app.post("/api/invoices/{invoice_id}/clear-extraction")
+async def clear_extraction(invoice_id: str):
+    """מחיקת נתוני הפענוח — החשבונית חוזרת לסטטוס 'ממתין לפענוח'."""
+    invoice = store.get(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+
+    invoice.extracted_data = None
+    invoice.extraction_ok = None
+    invoice.priority_validation = {}
+    invoice.error_message = ""
+    invoice.status = InvoiceStatus.PENDING_EXTRACTION
+    invoice.updated_at = datetime.now().isoformat()
+    store.save(invoice)
+
+    logger.info("נתוני הפענוח של חשבונית %s נמחקו", invoice_id)
+    return {"id": invoice.id, "status": invoice.status.value, "message": "נתוני הפענוח נמחקו"}
+
+
 @app.post("/api/invoices/{invoice_id}/update-field")
 async def update_invoice_field(invoice_id: str, body: dict = {}):
     """עדכון שדה בודד בנתוני החשבונית."""

@@ -111,8 +111,10 @@
                                     onclick="app.changeStatus('on_hold','הועבר להמתנה')">העבר להמתנה</button>
                             <button id="btn-cancel" class="btn btn-danger btn-sm" style="display:none"
                                     onclick="app.changeStatus('cancelled','בוטל')">בטל</button>
+                            <button id="btn-clear-extraction" class="btn btn-sm" style="background:var(--text-muted);color:#fff"
+                                    onclick="app.clearExtraction()">🧹 מחק פענוח</button>
                             <button id="btn-delete-modal" class="btn btn-sm" style="background:var(--text-muted);color:#fff"
-                                    onclick="app.deleteInvoice()">🗑 מחק</button>
+                                    onclick="app.deleteInvoice()">🗑 מחק חשבונית</button>
                         </div>
                         <button class="btn-expand" onclick="app.toggleFullscreen()" title="הגדל/הקטן מסך">
                             <span id="expand-icon">⛶</span>
@@ -192,7 +194,7 @@
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/js/app.js?v=tx32"></script>
+    <script src="/static/js/app.js?v=tx33"></script>
     <script src="/static/js/tact-header.js"></script>
 </body>
 </html>

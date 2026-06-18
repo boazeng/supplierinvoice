@@ -233,7 +233,7 @@ const app = {
             const actionBtns = document.getElementById('action-buttons');
             actionBtns.style.display = 'flex';
             actionBtns.innerHTML = `
-                <button class="btn" style="background:var(--text-muted);color:white" onclick="app.deleteInvoice()">🗑 מחק</button>
+                <button class="btn" style="background:var(--text-muted);color:white" onclick="app.deleteInvoice()">🗑 מחק חשבונית</button>
             `;
             document.getElementById('validation-warnings').style.display = 'none';
             return;
@@ -1211,6 +1211,29 @@ const app = {
             this.loadInvoices();
         } catch (err) {
             this.showToast('שגיאה במחיקה', 'error');
+        }
+    },
+
+    async clearExtraction() {
+        if (!this.currentInvoice) return;
+        if (!confirm('האם למחוק את נתוני הפענוח? החשבונית תחזור לסטטוס "ממתין לפענוח".')) return;
+
+        try {
+            const res = await fetch(`/api/invoices/${this.currentInvoice.id}/clear-extraction`, { method: 'POST' });
+            if (!res.ok) {
+                this.showToast('שגיאה במחיקת הפענוח', 'error');
+                return;
+            }
+            this.showToast('נתוני הפענוח נמחקו', 'info');
+            // רענון המודל מהשרת
+            const invRes = await fetch(`/api/invoices/${this.currentInvoice.id}`);
+            if (invRes.ok) {
+                this.currentInvoice = await invRes.json();
+                this.renderModal(this.currentInvoice);
+            }
+            this.loadInvoices();
+        } catch (err) {
+            this.showToast('שגיאה במחיקת הפענוח', 'error');
         }
     },
 
