@@ -621,19 +621,10 @@ const app = {
                     pos(); dd.style.display = 'block';
                 } catch { dd.style.display = 'none'; }
             };
-            input.addEventListener('input',  () => { clearTimeout(timer); timer = setTimeout(() => search(input.value), 250); });
-            input.addEventListener('focus',  () => search(input.value, true));
-            input.addEventListener('blur',   () => setTimeout(() => { dd.style.display = 'none'; }, 200));
-            dd.addEventListener('mousedown', e => {
-                e.preventDefault();
-                const li = e.target.closest('li');
-                if (!li) return;
-                const val = li.dataset.val;
-                input.value = val;
-                dd.style.display = 'none';
+            const persist = (val) => {
                 const idx = parseInt(input.dataset.jli);
+                if (this.currentJournalLines[idx].account === val) return;
                 this.currentJournalLines[idx].account = val;
-                // שמור גם ב-expense_account של הספק לזיכרון לטווח ארוך
                 if (this.currentJournalLines[idx].type === 'debit' && val) {
                     fetch(`/api/invoices/${this.currentInvoice.id}/update-field`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -642,6 +633,22 @@ const app = {
                     if (this.currentInvoice.extracted_data) this.currentInvoice.extracted_data.expense_account = val;
                 }
                 this.saveJournalLines();
+            };
+            input.addEventListener('input',  () => { clearTimeout(timer); timer = setTimeout(() => search(input.value), 250); });
+            input.addEventListener('focus',  () => search(input.value, true));
+            input.addEventListener('blur',   () => {
+                setTimeout(() => { dd.style.display = 'none'; }, 200);
+                persist(input.value.trim());
+            });
+            input.addEventListener('change', () => persist(input.value.trim()));
+            dd.addEventListener('mousedown', e => {
+                e.preventDefault();
+                const li = e.target.closest('li');
+                if (!li) return;
+                const val = li.dataset.val;
+                input.value = val;
+                dd.style.display = 'none';
+                persist(val);
             });
         });
     },
