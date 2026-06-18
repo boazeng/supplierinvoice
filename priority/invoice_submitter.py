@@ -180,7 +180,7 @@ async def submit_invoice_odata_only(
     if not invoice.extracted_data.supplier.priority_supplier_code:
         raise ValueError("לא נמצא קוד ספק בפריורטי — לא ניתן לקלוט")
 
-    logger.info("שלח OData בלבד — חשבונית %s ספק %s", invoice.id, supplier_code)
+    logger.info("שלח OData בלבד — חשבונית %s ספק %s", invoice.id, invoice.extracted_data.supplier.priority_supplier_code)
 
     payload = _build_priority_payload(invoice.extracted_data)
 
