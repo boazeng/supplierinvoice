@@ -1152,9 +1152,10 @@ const app = {
                 signal: controller.signal,
             });
             clearTimeout(timeoutId);
-            const data = await res.json();
+            let data;
+            try { data = await res.json(); } catch { data = {}; }
             if (!res.ok) {
-                this.showToast(data.detail || data.message || 'שגיאה באישור', 'error');
+                this.showToast(data.detail || data.message || `שגיאת שרת ${res.status}`, 'error');
                 if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
                 return;
             }
@@ -1167,7 +1168,7 @@ const app = {
             this.closeModal();
             this.loadInvoices();
         } catch (err) {
-            this.showToast('שגיאת תקשורת', 'error');
+            this.showToast(`שגיאת תקשורת: ${err.message || err}`, 'error');
             if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
         }
     },
