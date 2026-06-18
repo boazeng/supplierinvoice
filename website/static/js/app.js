@@ -1369,27 +1369,6 @@ const app = {
         }
     },
 
-    async syncWithPriority() {
-        const btn = document.getElementById('btn-sync');
-        btn.disabled = true;
-        btn.textContent = '⏳ מסנכרן...';
-
-        try {
-            const res = await fetch('/api/db/sync', { method: 'POST' });
-            const data = await res.json();
-            this.showToast(
-                `סנכרון הושלם — ${data.suppliers_synced} ספקים, ${data.customers_synced} לקוחות, ${data.branches_synced || 0} חברות`,
-                'success'
-            );
-            this.loadSyncStatus();
-        } catch (err) {
-            this.showToast('שגיאה בסנכרון', 'error');
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '🔄 סנכרן פריורטי';
-        }
-    },
-
     // === בדיקה לפני קליטה ===
     // === Autocomplete ===
     _setupAcFields(container) {
