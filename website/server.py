@@ -1077,7 +1077,10 @@ async def approve_invoice(invoice_id: str, background_tasks: BackgroundTasks, bo
     invoice.user_notes = body.get("notes", "")
 
     # שלב 1: OData POST בלבד — מהיר, לא חוסם
-    invoice = await submit_invoice_odata_only(invoice, priority_client, store)
+    try:
+        invoice = await submit_invoice_odata_only(invoice, priority_client, store)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     if not invoice.priority_invoice_id:
         # כישלון בשלב 1 — אין T-number
