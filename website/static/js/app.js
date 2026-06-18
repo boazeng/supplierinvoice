@@ -79,7 +79,8 @@ const app = {
             // טוענים את הכל פעם אחת — סופרים לפי לשונית ומסננים בצד-לקוח
             const res = await fetch('/api/invoices');
             const data = await res.json();
-            const all = data.invoices || [];
+            // חשבוניות שתויקו לא מוצגות יותר במסך
+            const all = (data.invoices || []).filter(inv => inv.status !== 'filed');
 
             // עדכון מספר בכל לשונית — מסונן לפי data-status + data-source
             const matches = (inv, status, source) =>
