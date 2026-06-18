@@ -837,25 +837,19 @@ body {
     to   { transform: translateX(0);     opacity: 1; }
 }
 
-/* === TACT logo inside modal === */
-.modal-tact-logo {
-    padding: 8px 2px 10px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 8px;
+/* === TACT logo inside modal toolbar === */
+.modal-toolbar .tact-logo-letter {
+    font-size: 1.1rem;
 }
 
-.modal-tact-logo .tact-logo-letter {
-    font-size: 1.15rem;
+.modal-toolbar .tact-logo-dot {
+    width: 0.2rem;
+    height: 0.2rem;
+    margin: 0 0.18rem;
 }
 
-.modal-tact-logo .tact-logo-dot {
-    width: 0.22rem;
-    height: 0.22rem;
-    margin: 0 0.2rem;
-}
-
-.modal-tact-logo .tact-logo-word {
-    font-size: 0.68rem;
+.modal-toolbar .tact-logo-word {
+    font-size: 0.65rem;
 }
 
 /* === Data Section Cards (modal) === */

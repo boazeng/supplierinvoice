@@ -93,6 +93,17 @@
             <div class="modal-overlay" onclick="app.closeModal()"></div>
             <div class="modal-content" id="modal-content">
                 <div class="modal-toolbar">
+                    <span class="tact-logo" style="flex-shrink:0">
+                        <span class="tact-logo-row">
+                            <span class="tact-logo-mark">
+                                <span class="tact-logo-seg"><span class="tact-logo-letter">T</span><span class="tact-logo-dot"></span></span>
+                                <span class="tact-logo-seg"><span class="tact-logo-letter">A</span><span class="tact-logo-dot"></span></span>
+                                <span class="tact-logo-seg"><span class="tact-logo-letter">C</span><span class="tact-logo-dot"></span></span>
+                                <span class="tact-logo-seg"><span class="tact-logo-letter">T</span></span>
+                            </span>
+                            <span class="tact-logo-word">bookkeeping</span>
+                        </span>
+                    </span>
                     <h3 style="font-size:0.95rem;font-weight:600;margin:0">פרטי חשבונית</h3>
                     <div style="display:flex;align-items:center;gap:10px">
                         <!-- כפתורי פעולה — נראות לפי סטטוס (app.renderModal) -->
@@ -160,19 +171,6 @@
                     <!-- Right: Extracted Data -->
                     <div class="data-pane">
                         <div class="data-pane-scroll">
-                            <div class="modal-tact-logo">
-                                <span class="tact-logo">
-                                    <span class="tact-logo-row">
-                                        <span class="tact-logo-mark">
-                                            <span class="tact-logo-seg"><span class="tact-logo-letter">T</span><span class="tact-logo-dot"></span></span>
-                                            <span class="tact-logo-seg"><span class="tact-logo-letter">A</span><span class="tact-logo-dot"></span></span>
-                                            <span class="tact-logo-seg"><span class="tact-logo-letter">C</span><span class="tact-logo-dot"></span></span>
-                                            <span class="tact-logo-seg"><span class="tact-logo-letter">T</span></span>
-                                        </span>
-                                        <span class="tact-logo-word">bookkeeping</span>
-                                    </span>
-                                </span>
-                            </div>
                             <div id="extracted-data"></div>
 
                             <!-- Validation Warnings -->
