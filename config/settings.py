@@ -27,7 +27,7 @@ PRIORITY_SYNC_INTERVAL_MINUTES: int = int(os.getenv("PRIORITY_SYNC_INTERVAL_MINU
 
 # --- Anthropic AI ---
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-AI_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+AI_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 
 # --- אימייל (אופציונלי) ---
 EMAIL_HOST: str = os.getenv("EMAIL_HOST", "smtp.gmail.com")
