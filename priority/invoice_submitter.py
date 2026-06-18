@@ -14,49 +14,56 @@ logger = logging.getLogger("פריורטי.קליטה")
 def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
     """מחלץ קוד ספק ופריטים מפקודת היומן הנערכת.
     מחזיר (supplier_code, items) כאשר items הם PINVOICEITEMS_SUBFORM.
-    קוד הספק נלקח תמיד מנתוני הפענוח (priority_supplier_code), לא מפקודת היומן."""
+    קוד הספק נלקח תמיד מנתוני הפענוח (priority_supplier_code), לא מפקודת היומן.
+
+    מדיניות: השדות שנשלחים ל-Priority חייבים להגיע מהמשתמש כמו שהם —
+    בלי fallback שקט. חסר תיאור/סכום → ValueError עם הודעה מפורשת."""
     jl = getattr(data, 'journal_lines', None) or []
-    debit_rows  = [l for l in jl if l.get('type') == 'debit']
+    debit_rows = [l for l in jl if l.get('type') == 'debit']
+
+    if not debit_rows:
+        raise ValueError("אין שורות חיוב בפקודת היומן — יש להזין לפחות שורה אחת לפני הקליטה")
 
     supplier_code = data.supplier.priority_supplier_code
 
-    if debit_rows:
-        items = [
-            {
-                "PARTNAME": "000",
-                "PDES": (ln.get('description') or data.supplier.name or "חשבונית ספק")[:100],
-                "TQUANT": 1,
-                "PRICE": float(ln.get('debit', 0)),
-            }
-            for ln in debit_rows
-        ]
-    else:
-        # אין שורות יומן — fallback לנתוני פענוח
-        pdes = ("; ".join(l.description for l in data.lines if l.description)[:100]
-                if data.lines else data.supplier.name or "חשבונית ספק")
-        items = [{"PARTNAME": "000", "PDES": pdes, "TQUANT": 1, "PRICE": data.subtotal}]
+    items = []
+    for i, ln in enumerate(debit_rows, 1):
+        desc = (ln.get('description') or '').strip()
+        if not desc:
+            raise ValueError(f"שורת חיוב {i} ללא תיאור — יש להזין תיאור לפני הקליטה")
+        debit_val = ln.get('debit')
+        if debit_val in (None, '', 0):
+            raise ValueError(f"שורת חיוב {i} ללא סכום — יש להזין סכום לפני הקליטה")
+        items.append({
+            "PARTNAME": "000",
+            "PDES": desc[:100],
+            "TQUANT": 1,
+            "PRICE": float(debit_val),
+        })
 
     return supplier_code, items
 
 
 def _build_priority_payload(data: InvoiceData) -> dict:
     """בונה את ה-payload לקליטה ב-PINVOICES.
-    מספר החשבונית, תאריך, סניף והקצאה — מהפענוח.
-    ספק וסכומים — מפקודת היומן אם קיימת, אחרת מהפענוח."""
+    כל שדה שעובר ל-Priority מגיע ישירות מהמשתמש (פקודת יומן או שדות הפענוח)
+    בלי שינוי, transformation או fallback. חוסר נתון → ValueError בולט."""
+    if not data.invoice_date:
+        raise ValueError("תאריך חשבונית חסר — יש לערוך ולהזין תאריך לפני הקליטה")
+    if not data.customer.branch:
+        raise ValueError("סניף חסר — יש לערוך ולהזין סניף לפני הקליטה")
+
     supplier_code, items = _extract_journal_fields(data)
-    pdes = items[0]["PDES"] if items else (data.supplier.name or "חשבונית ספק")
 
     payload = {
         "DEBIT": "D",
         "BOOKNUM": data.invoice_number,
         "IVDATE": data.invoice_date,
         "SUPNAME": supplier_code,
-        "DETAILS": pdes,
+        "DETAILS": items[0]["PDES"],
+        "BRANCHNAME": data.customer.branch,
         "PINVOICEITEMS_SUBFORM": items,
     }
-
-    if data.customer.branch:
-        payload["BRANCHNAME"] = data.customer.branch
 
     if data.allocation_number:
         payload["SDINUMIT"] = data.allocation_number
