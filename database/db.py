@@ -96,11 +96,17 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             account_code TEXT NOT NULL UNIQUE,
             account_name TEXT NOT NULL,
+            account_type TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # מיגרציה: הוספת account_type לטבלאות קיימות (SQLite לא תומך IF NOT EXISTS על עמודה)
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(accounts)")}
+    if "account_type" not in existing_cols:
+        conn.execute("ALTER TABLE accounts ADD COLUMN account_type TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_code ON accounts(account_code)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_name ON accounts(account_name)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(account_type)")
     conn.commit()
     conn.close()
     logger.info("בסיס הנתונים אותחל: %s", DB_PATH)
@@ -353,14 +359,20 @@ def set_supplier_expense_account(supplier_priority_code: str, expense_account: s
 # --- חשבונות GL (מסונכרנים מפריורטי) ---
 
 def _add_account_filters(conditions: list, params: list, branch: str, account_type: str) -> None:
-    """מוסיף תנאי סינון לפי סניף וסוג חשבון (helper פנימי)."""
+    """מוסיף תנאי סינון לפי סניף וסוג חשבון (helper פנימי).
+    סוג החשבון נקבע לפי ACCTYPENAME של Priority (לא לפי תחילית הקוד —
+    תחילית הקוד תלויה בתרשים החשבונות של החברה הספציפית).
+    'expense' = כל מה שלא ספק/לקוח. 'supplier' = ACCTYPENAME='ספקים'."""
     if branch:
         conditions.append("account_code LIKE ?")
         params.append(f"%-{branch}")
     if account_type == "expense":
-        conditions.append("(account_code LIKE '5%' OR account_code LIKE '6%')")
+        # כל החשבונות הראשיים של הסניף, למעט ספקים/לקוחות
+        conditions.append("(account_type IS NULL OR account_type NOT IN ('ספקים','לקוחות'))")
     elif account_type == "supplier":
-        conditions.append("account_code LIKE '4%'")
+        conditions.append("account_type = 'ספקים'")
+    elif account_type == "customer":
+        conditions.append("account_type = 'לקוחות'")
 
 
 def search_accounts(q: str, limit: int = 15, branch: str = "", account_type: str = "") -> list[dict]:
@@ -402,17 +414,18 @@ def get_accounts_count() -> int:
 
 
 def bulk_upsert_accounts(records: list[dict]) -> int:
-    """עדכון מרובה של חשבונות."""
+    """עדכון מרובה של חשבונות. כל רשומה: account_code, account_name, account_type (אופציונלי)."""
     conn = get_connection()
     count = 0
     for rec in records:
         conn.execute("""
-            INSERT INTO accounts (account_code, account_name, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO accounts (account_code, account_name, account_type, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(account_code) DO UPDATE SET
                 account_name = excluded.account_name,
+                account_type = excluded.account_type,
                 updated_at = CURRENT_TIMESTAMP
-        """, (rec["account_code"], rec["account_name"]))
+        """, (rec["account_code"], rec["account_name"], rec.get("account_type")))
         count += 1
     conn.commit()
     conn.close()

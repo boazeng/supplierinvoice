@@ -478,7 +478,7 @@ const app = {
         const invTotal   = parseFloat(d.total_amount) || 0;
         const totalOk    = Math.abs(totCr - invTotal)  < 0.01;
         const drCount    = lines.filter(l => l.type === 'debit').length;
-        const ep_exp = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}`;
+        const ep_exp = `/api/db/accounts/search?branch=${encodeURIComponent(branch)}&account_type=expense`;
         const ep_sup = `/api/db/suppliers/journal-accounts?branch=${encodeURIComponent(branch)}`;
 
         const rowHtml = (l, i) => {

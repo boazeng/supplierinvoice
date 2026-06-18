@@ -140,21 +140,41 @@ async def sync_branches(client: PriorityClient) -> int:
 
 
 async def sync_accounts(client: PriorityClient) -> int:
-    """מסנכרן חשבונות GL מפריורטי ל-DB."""
+    """מסנכרן חשבונות GL מפריורטי ל-DB עם pagination.
+    מדלג על חשבונות INACTIVE. שומר ACCTYPENAME כדי לסנן אחר־כך לפי סוג חשבון."""
     logger.info("מתחיל סנכרון חשבונות...")
-    result = await client._get("ACCOUNTS", params={
-        "$select": "ACCNAME,ACCDES",
-        "$top": "2000",
-    })
-    if not result or not result.get("value"):
+    page_size = 1000
+    skip = 0
+    all_records: list[dict] = []
+    while True:
+        result = await client._get("ACCOUNTS", params={
+            "$select": "ACCNAME,ACCDES,ACCTYPENAME,INACTIVE",
+            "$top": str(page_size),
+            "$skip": str(skip),
+        })
+        if not result or not result.get("value"):
+            break
+        batch = result["value"]
+        for a in batch:
+            if not a.get("ACCNAME"):
+                continue
+            if a.get("INACTIVE"):
+                continue
+            all_records.append({
+                "account_code": a["ACCNAME"],
+                "account_name": a.get("ACCDES", "") or "",
+                "account_type": a.get("ACCTYPENAME") or None,
+            })
+        logger.info("סנכרון חשבונות: דף %d — %d רשומות", skip // page_size + 1, len(batch))
+        if len(batch) < page_size:
+            break
+        skip += page_size
+
+    if not all_records:
         logger.warning("ACCOUNTS לא זמין או ריק — דילוג")
         return 0
 
-    records = [
-        {"account_code": a["ACCNAME"], "account_name": a.get("ACCDES", "")}
-        for a in result["value"] if a.get("ACCNAME")
-    ]
-    count = db.bulk_upsert_accounts(records)
+    count = db.bulk_upsert_accounts(all_records)
     logger.info("סנכרון חשבונות הושלם — סה\"כ %d", count)
     return count
 
