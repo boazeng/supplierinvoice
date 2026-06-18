@@ -1200,7 +1200,11 @@ const app = {
     },
 
     async deleteInvoiceById(id, fromModal = false) {
-        if (!confirm('האם למחוק את החשבונית? פעולה זו בלתי הפיכה.')) return;
+        const ok = await this.showConfirm(
+            'החשבונית והקובץ יימחקו לצמיתות. פעולה זו בלתי הפיכה.',
+            { title: 'מחיקת חשבונית', confirmText: 'מחק חשבונית', icon: '🗑', type: 'danger' }
+        );
+        if (!ok) return;
 
         try {
             const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
@@ -1216,7 +1220,11 @@ const app = {
 
     async clearExtraction() {
         if (!this.currentInvoice) return;
-        if (!confirm('האם למחוק את נתוני הפענוח? החשבונית תחזור לסטטוס "ממתין לפענוח".')) return;
+        const ok = await this.showConfirm(
+            'נתוני הפענוח יימחקו והחשבונית תחזור לסטטוס "ממתין לפענוח". הקובץ עצמו יישמר.',
+            { title: 'מחיקת נתוני פענוח', confirmText: 'מחק פענוח', icon: '🧹', type: 'danger' }
+        );
+        if (!ok) return;
 
         try {
             const res = await fetch(`/api/invoices/${this.currentInvoice.id}/clear-extraction`, { method: 'POST' });
@@ -1453,6 +1461,54 @@ const app = {
     },
 
     // === Toast Notifications ===
+    // דיאלוג אישור מעוצב — מחזיר Promise<boolean>
+    showConfirm(message, opts = {}) {
+        const {
+            title = 'אישור פעולה',
+            confirmText = 'אישור',
+            cancelText = 'ביטול',
+            type = 'danger',     // danger | info
+            icon = type === 'danger' ? '🗑' : 'ℹ️',
+        } = opts;
+
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.className = 'confirm-overlay';
+            overlay.innerHTML = `
+                <div class="confirm-box" role="dialog" aria-modal="true">
+                    <div class="confirm-icon ${type}">${icon}</div>
+                    <h3 class="confirm-title">${title}</h3>
+                    <p class="confirm-message">${message}</p>
+                    <div class="confirm-actions">
+                        <button class="btn confirm-btn-cancel" data-act="cancel">${cancelText}</button>
+                        <button class="btn ${type === 'danger' ? 'btn-danger' : 'btn-primary'}" data-act="ok">${confirmText}</button>
+                    </div>
+                </div>
+            `;
+
+            const close = (val) => {
+                document.removeEventListener('keydown', onKey);
+                overlay.remove();
+                resolve(val);
+            };
+            const onKey = (e) => {
+                if (e.key === 'Escape') close(false);
+                if (e.key === 'Enter') close(true);
+            };
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) close(false);
+                const act = e.target.dataset.act;
+                if (act === 'ok') close(true);
+                if (act === 'cancel') close(false);
+            });
+            document.addEventListener('keydown', onKey);
+
+            document.body.appendChild(overlay);
+            overlay.querySelector('[data-act="ok"]').focus();
+        });
+    },
+
     showToast(message, type = 'info') {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
