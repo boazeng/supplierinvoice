@@ -581,6 +581,7 @@ const app = {
 
         // שינוי סוג מע"מ / סוג תנועה
         box.querySelector('#vat-type-sel').addEventListener('change', async (e) => {
+            e.target.blur(); // מנע מה-focus לנחות על כפתור submit אחרי ה-re-render
             const newVatType  = e.target.value;
             const newFncpat   = newVatType === 'two_thirds' ? '2/3' : '';
             d.vat_type    = newVatType;
@@ -1217,12 +1218,12 @@ const app = {
             }
             if (data.status === 'pending_filing') {
                 this.showToast('החשבונית נקלטה בפריורטי בהצלחה!', 'success');
+                this.closeModal();
+                this.loadInvoices();
             } else {
                 this.showToast(data.message || 'שגיאה בקליטה בפריורטי', 'error');
                 if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
             }
-            this.closeModal();
-            this.loadInvoices();
         } catch (err) {
             this.showToast(`שגיאת תקשורת: ${err.message || err}`, 'error');
             if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
