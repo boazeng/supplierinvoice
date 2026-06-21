@@ -127,6 +127,8 @@
                             <button id="btn-delete-modal" class="btn btn-sm" style="background:var(--text-muted);color:#fff"
                                     onclick="app.deleteInvoice()">🗑 מחק חשבונית</button>
                         </div>
+                        <button id="expand-icon" title="מסך מלא" onclick="app.toggleBrowserFullscreen()"
+                                style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1">⛶</button>
                         <button class="modal-close" onclick="app.closeModal()">&times;</button>
                     </div>
                 </div>
@@ -161,19 +163,20 @@
                             </div>
                         </div>
                     </div>
-                    <!-- עמודה 2: נתוני חשבונית -->
-                    <div class="data-pane">
-                        <div class="data-pane-scroll">
-                            <div id="extracted-data"></div>
-                            <div id="validation-warnings" class="warnings-box" style="display:none;">
-                                <h4>אזהרות</h4>
-                                <ul id="warnings-list"></ul>
+                    <!-- עמודה 2: נתוני חשבונית + פקודת יומן -->
+                    <div class="right-pane">
+                        <div class="data-pane">
+                            <div class="data-pane-scroll">
+                                <div id="extracted-data"></div>
+                                <div id="validation-warnings" class="warnings-box" style="display:none;">
+                                    <h4>אזהרות</h4>
+                                    <ul id="warnings-list"></ul>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <!-- עמודה 3: פקודת יומן -->
-                    <div class="journal-pane">
-                        <div id="transaction-preview"></div>
+                        <div class="journal-pane">
+                            <div id="transaction-preview"></div>
+                        </div>
                     </div>
                 </div>
             </div>

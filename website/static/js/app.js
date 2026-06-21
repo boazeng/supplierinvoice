@@ -18,6 +18,11 @@ const app = {
         this.loadInvoices();
         this.loadSyncStatus();
         this._setupKeyboardShortcuts();
+        // עדכון אייקון כשיוצאים מ-fullscreen דרך Escape
+        document.addEventListener('fullscreenchange', () => {
+            const icon = document.getElementById('expand-icon');
+            if (icon) icon.textContent = document.fullscreenElement ? '✕' : '⛶';
+        });
         // polling כל 5 שניות
         this.pollingInterval = setInterval(() => this.loadInvoices(), 5000);
     },
@@ -743,6 +748,17 @@ const app = {
             if (icon) icon.textContent = '✕';
         } else {
             modal.classList.remove('fullscreen');
+            if (icon) icon.textContent = '⛶';
+        }
+    },
+
+    toggleBrowserFullscreen() {
+        const icon = document.getElementById('expand-icon');
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+            if (icon) icon.textContent = '✕';
+        } else {
+            document.exitFullscreen();
             if (icon) icon.textContent = '⛶';
         }
     },
