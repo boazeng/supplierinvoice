@@ -11,6 +11,18 @@ from tools.invoice_store import InvoiceStore
 logger = logging.getLogger("פריורטי.קליטה")
 
 
+async def _attach_invoice_file(
+    priority_client,
+    ivnum: str,
+    file_path: str,
+) -> None:
+    """מצרף את קובץ ה-PDF של החשבונית ל-EXTFILES של PINVOICES ב-Priority."""
+    pinvoice_key = f"IVNUM='{ivnum}',IVTYPE='P',DEBIT='D'"
+    ok = await priority_client.attach_extfile("PINVOICES", pinvoice_key, file_path)
+    if not ok:
+        logger.warning("תיוק קובץ ב-EXTFILES נכשל — IVNUM: %s", ivnum)
+
+
 def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
     """מחלץ קוד ספק ופריטים מפקודת היומן הנערכת.
     מחזיר (supplier_code, items) כאשר items הם PINVOICEITEMS_SUBFORM.
@@ -34,11 +46,15 @@ def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
         debit_val = ln.get('debit')
         if debit_val in (None, '', 0):
             raise ValueError(f"שורת חיוב {i} ללא סכום — יש להזין סכום לפני הקליטה")
+        account = (ln.get('account') or '').strip()
+        if not account:
+            raise ValueError(f"שורת חיוב {i} ללא חשבון הוצאות — יש להזין חשבון לפני הקליטה")
         items.append({
             "PARTNAME": "000",
             "PDES": desc[:100],
             "TQUANT": 1,
             "PRICE": float(debit_val),
+            "ACCNAME": account,
         })
 
     return supplier_code, items
@@ -109,6 +125,8 @@ async def _finalize_in_priority(
             invoice.status               = InvoiceStatus.PENDING_FILING
             invoice.error_message        = ""
             logger.info("CLOSEPRINTPIV הצליח — IVNUM: %s, FNCNUM: %s", final_ivnum, fncnum)
+            if invoice.file_path:
+                await _attach_invoice_file(priority_client, final_ivnum, invoice.file_path)
         else:
             err_detail = result.get("error", "") or result.get("stderr", "")
             # בפריורטי, CLOSEPRINTPIV יוצר רשומה חדשה עם IVNUM סופי — ה-T-number הישן נשאר.
@@ -136,6 +154,8 @@ async def _finalize_in_priority(
                         invoice.status = InvoiceStatus.PENDING_FILING
                         invoice.error_message = ""
                         logger.info("נמצא IVNUM סופי לפי BOOKNUM: %s, FNCNUM: %s", found_ivnum, found_fncnum)
+                        if invoice.file_path:
+                            await _attach_invoice_file(priority_client, found_ivnum, invoice.file_path)
                         return
             invoice.status        = InvoiceStatus.PENDING_SUBMISSION
             invoice.error_message = f"CLOSEPRINTPIV נכשל: {err_detail}" if err_detail else "CLOSEPRINTPIV לא הצליח — בדוק יומן שרת"
@@ -154,6 +174,8 @@ async def _finalize_in_priority(
         if fncnum:
             invoice.priority_journal_id = str(fncnum)
         invoice.status = InvoiceStatus.PENDING_FILING
+        if invoice.file_path:
+            await _attach_invoice_file(priority_client, ivnum, invoice.file_path)
 
 
 async def finalize_invoice_background(

@@ -69,6 +69,32 @@ class PriorityClient:
             logger.error("שגיאת תקשורת עם Priority: %s", e)
             raise
 
+    async def attach_extfile(self, parent_entity: str, parent_key: str, file_path: str) -> bool:
+        """מצרף קובץ ל-EXTFILES של רשומה דרך OData (POST ל-subform).
+        parent_entity: שם הישות, למשל 'PINVOICES'
+        parent_key: המפתח המורכב, למשל "IVNUM='12345',IVTYPE='P',DEBIT='D'"
+        """
+        import base64
+        from pathlib import Path
+        p = Path(file_path)
+        if not p.exists():
+            logger.warning("קובץ לא נמצא לצירוף ל-EXTFILES: %s", file_path)
+            return False
+        content_b64 = base64.b64encode(p.read_bytes()).decode()
+        ext = p.suffix.lstrip('.').upper() or 'PDF'
+        endpoint = f"{parent_entity}({parent_key})/EXTFILES_SUBFORM"
+        try:
+            await self._post(endpoint, {
+                "EXTDOCNO": p.name,
+                "EXTFILETYPE": ext,
+                "EXTFILEDATA": content_b64,
+            })
+            logger.info("קובץ צורף ל-EXTFILES של %s(%s)", parent_entity, parent_key)
+            return True
+        except Exception as e:
+            logger.warning("שגיאה בצירוף קובץ ל-EXTFILES של %s: %s", parent_entity, e)
+            return False
+
     # --- ספקים ---
 
     async def find_supplier_by_tax_id(self, tax_id: str) -> Optional[dict]:
