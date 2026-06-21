@@ -740,10 +740,10 @@ const app = {
         this.isFullscreen = forceOn !== null ? forceOn : !this.isFullscreen;
         if (this.isFullscreen) {
             modal.classList.add('fullscreen');
-            icon.textContent = '✕';
+            if (icon) icon.textContent = '✕';
         } else {
             modal.classList.remove('fullscreen');
-            icon.textContent = '⛶';
+            if (icon) icon.textContent = '⛶';
         }
     },
 
