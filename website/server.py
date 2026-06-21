@@ -736,7 +736,7 @@ async def file_invoice_to_ledger(invoice_id: str):
         divider_name = div_map.get(divider_id, "")
     logger.info("חשבונית %s תויקה בספרי הנהלת חשבונות — %s/%d/%s",
                 invoice_id, company_name, year, divider_name or "ללא חוצץ")
-    return {"ok": True, "branch": branch, "company_name": company_name,
+    return {"ok": True, "branch": branch_name, "company_name": company_name,
             "year": year, "divider_name": divider_name}
 
 
