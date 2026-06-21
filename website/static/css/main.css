@@ -355,22 +355,14 @@ body {
 .modal-content {
     position: relative;
     background: var(--bg-secondary);
-    border-radius: var(--radius);
-    width: 90%;
-    max-width: 1400px;
-    height: 88vh;
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-.modal-content.fullscreen {
+    border-radius: 0;
     width: 100%;
     max-width: 100%;
     height: 100vh;
-    border-radius: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .modal-toolbar {
@@ -396,7 +388,7 @@ body {
 
 .modal-body {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.4fr 1.5fr 1.1fr;
     grid-template-rows: 1fr;
     flex: 1;
     min-height: 0;
@@ -540,34 +532,35 @@ body {
 .data-pane {
     padding: 0;
     overflow: hidden;
-    display: grid;
-    grid-template-rows: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
 }
 
 .data-pane-scroll {
     overflow-y: auto;
-    padding: 8px 12px 6px;
+    padding: 8px 12px;
     min-height: 0;
-    border-bottom: 2px solid var(--border);
+    flex: 1;
 }
 
-#transaction-preview {
+/* === Journal Pane (עמודה שלישית) === */
+.journal-pane {
     overflow-y: auto;
     padding: 8px 10px;
     min-height: 0;
     background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+}
+
+#transaction-preview {
+    overflow: visible;
+    padding: 0;
+    background: transparent;
 }
 
 #transaction-preview .tx-card {
     margin: 0;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-#transaction-preview .tx-table {
-    flex: 1;
 }
 
 .data-pane h3 {

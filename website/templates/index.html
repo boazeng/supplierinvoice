@@ -6,7 +6,7 @@
     <title>קליטת חשבוניות ספק</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/main.css?v=tact11">
+    <link rel="stylesheet" href="/static/css/main.css?v=tact12">
     <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
 </head>
 <body>
@@ -127,14 +127,11 @@
                             <button id="btn-delete-modal" class="btn btn-sm" style="background:var(--text-muted);color:#fff"
                                     onclick="app.deleteInvoice()">🗑 מחק חשבונית</button>
                         </div>
-                        <button class="btn-expand" onclick="app.toggleFullscreen()" title="הגדל/הקטן מסך">
-                            <span id="expand-icon">⛶</span>
-                        </button>
                         <button class="modal-close" onclick="app.closeModal()">&times;</button>
                     </div>
                 </div>
                 <div class="modal-body">
-                    <!-- Left: File Preview -->
+                    <!-- עמודה 1: תצוגת קובץ -->
                     <div class="preview-pane" id="preview-pane">
                         <div class="preview-top-bar">
                             <h3>קובץ מקור</h3>
@@ -145,43 +142,37 @@
                                 <button class="btn btn-primary btn-sm" onclick="app.reextractInvoice()" id="btn-reextract">
                                     🔄 פענוח חוזר
                                 </button>
-                                <span style="margin-right:auto"></span>
                             </div>
                         </div>
                         <div class="preview-container" id="preview-container">
                             <iframe id="file-preview-iframe" class="file-preview" style="display:none"></iframe>
                             <img id="file-preview-img" class="file-preview" style="display:none; object-fit:contain" />
-                            <!-- ריבוע כחול — ח.פ/ע.מ ספק -->
                             <div id="highlight-box-supplier" class="highlight-box highlight-supplier" style="display:none" data-target="supplier">
                                 <div class="highlight-label">ח.פ / ע.מ ספק</div>
                                 <div class="resize-handle resize-handle-br"></div>
                             </div>
-                            <!-- ריבוע אדום — ח.פ/ע.מ לקוח -->
                             <div id="highlight-box-customer" class="highlight-box highlight-customer" style="display:none" data-target="customer">
                                 <div class="highlight-label">ח.פ / ע.מ לקוח</div>
                                 <div class="resize-handle resize-handle-br"></div>
                             </div>
-                            <!-- ריבוע ירוק — מספר הקצאה -->
                             <div id="highlight-box-allocation" class="highlight-box highlight-allocation" style="display:none" data-target="allocation">
                                 <div class="highlight-label">מספר הקצאה</div>
                                 <div class="resize-handle resize-handle-br"></div>
                             </div>
                         </div>
                     </div>
-                    <!-- Right: Extracted Data -->
+                    <!-- עמודה 2: נתוני חשבונית -->
                     <div class="data-pane">
                         <div class="data-pane-scroll">
                             <div id="extracted-data"></div>
-
-                            <!-- Validation Warnings -->
                             <div id="validation-warnings" class="warnings-box" style="display:none;">
                                 <h4>אזהרות</h4>
                                 <ul id="warnings-list"></ul>
                             </div>
-
                         </div>
-
-                        <!-- Transaction Preview — journal entry column -->
+                    </div>
+                    <!-- עמודה 3: פקודת יומן -->
+                    <div class="journal-pane">
                         <div id="transaction-preview"></div>
                     </div>
                 </div>
