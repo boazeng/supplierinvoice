@@ -350,6 +350,42 @@ async function main() {
     }
   }
 
+  // צירוף קובץ ל-PINVOICES עם ה-IVNUM הסופי (החשבונית שנסגרה)
+  if (filePath && fs.existsSync(filePath) && ivnumFinal && !isTempIvnum(ivnumFinal)) {
+    process.stderr.write(`Attaching file to final PINVOICES ${ivnumFinal}...\n`);
+    try {
+      const finalInvForm = await withTimeout(
+        new Promise((res, rej) => priority.formStartEx(
+          'PINVOICES',
+          makeMessageHandler('PINVOICES_FINAL'),
+          null,
+          company, 1, { zoomValue: ivnumFinal }, res, rej
+        )),
+        30000, 'formStartEx PINVOICES final'
+      );
+      const pinvSub = await withTimeout(
+        new Promise((res, rej) => finalInvForm.startSubForm(
+          'EXTFILES', makeMessageHandler('PINVOICES_FINAL.EXTFILES'), null, res, rej
+        )),
+        20000, 'startSubForm PINVOICES EXTFILES'
+      );
+      await withTimeout(new Promise((res, rej) => pinvSub.newRow(res, rej)), 10000, 'newRow PINVOICES');
+      const pExt  = path.extname(filePath).toLowerCase().replace('.', '');
+      const pMime = pExt === 'pdf' ? 'application/pdf' : `image/${pExt}`;
+      const pData = `data:${pMime};base64,` + fs.readFileSync(filePath).toString('base64');
+      await withTimeout(
+        new Promise((res, rej) => pinvSub.uploadDataUrl(pData, pExt, () => {}, res, rej)),
+        60000, 'uploadDataUrl PINVOICES'
+      );
+      await withTimeout(new Promise((res, rej) => pinvSub.saveRow(false, res, rej)), 15000, 'saveRow PINVOICES');
+      await withTimeout(new Promise((res, rej) => pinvSub.endCurrentForm(false, res, rej)), 15000, 'endSubForm PINVOICES');
+      await withTimeout(new Promise((res, rej) => finalInvForm.endCurrentForm(false, res, rej)), 15000, 'endForm PINVOICES');
+      process.stderr.write(`File attached to PINVOICES ${ivnumFinal}\n`);
+    } catch (e) {
+      process.stderr.write(`PINVOICES EXTFILES final attach failed: ${e.message}\n`);
+    }
+  }
+
   // החשבונית נסגרה אם ה-IVNUM הוא כבר מספר סופי (לא T)
   if (!isTempIvnum(ivnumFinal) && ivnumFinal) {
     console.log(JSON.stringify({ ok: true, fncnum, ivnum: ivnumFinal }));
