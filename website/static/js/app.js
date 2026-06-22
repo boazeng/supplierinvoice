@@ -458,9 +458,7 @@ const app = {
                 description: ln.description || `שורה ${i + 1}`,
                 debit: parseFloat(ln.total_price || ln.unit_price || 0), credit: 0,
             }));
-            if (vatNd > 0) {
-                lines.push({ id: 'vat_nd', type: 'debit', account: expAcc, description: 'הוצאות רכב — מע"מ לא מוכר (1/3)', debit: vatNd, credit: 0 });
-            }
+            // ב-2/3 — ה-1/3 שאינו מנוכה לא נכנס לשורה נפרדת; הוא ייספג בשורה הראשונה ע"י _rebalanceFirstDebit
         } else {
             // total - vatDed מבטיח שהסכום הכולל יהיה בדיוק total_amount (ללא תלות בעיגולי subtotal)
             const expDebit = vatDed > 0 ? Math.round((total - vatDed) * 100) / 100 : subtotal;
@@ -471,6 +469,29 @@ const app = {
         }
         lines.push({ id: 'sup', type: 'credit', account: supAcc, description: (d.supplier && d.supplier.name) || 'ספק', debit: 0, credit: total });
         this.currentJournalLines = lines;
+        this._rebalanceFirstDebit();
+    },
+
+    // מאזן את פקודת היומן — שורת החיוב הראשונה סופגת את ההפרש בין סה"כ זכות לסה"כ
+    // החיובים/מע"מ הנותרים. אם אין שורת חיוב — לא עושה כלום. נקרא אחרי כל שינוי
+    // שאינו עריכה ישירה של השורה הראשונה (מחיקת שורה, שינוי סוג מע"מ, עריכת שורה אחרת).
+    _rebalanceFirstDebit() {
+        const lines = this.currentJournalLines || [];
+        if (!lines.length) return;
+        const firstDebitIdx = lines.findIndex(l => l.type === 'debit');
+        if (firstDebitIdx < 0) return;
+
+        let totCredit = 0;
+        let otherDebit = 0;
+        lines.forEach((l, i) => {
+            if (l.type === 'credit') {
+                totCredit += parseFloat(l.credit || 0);
+            } else if (i !== firstDebitIdx && (l.type === 'debit' || l.type === 'vat')) {
+                otherDebit += parseFloat(l.debit || 0);
+            }
+        });
+        const newFirstDebit = Math.round((totCredit - otherDebit) * 100) / 100;
+        lines[firstDebitIdx].debit = Math.max(0, newFirstDebit);
     },
 
     _renderJournalTable(box, d, branch) {
@@ -632,22 +653,33 @@ const app = {
             this.saveJournalLines();
         });
 
-        // מחק שורה
+        // מחק שורה — אחרי המחיקה נאזן את שורת החיוב הראשונה
         box.querySelectorAll('.jl-del').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.currentJournalLines.splice(parseInt(btn.dataset.jldel), 1);
+                this._rebalanceFirstDebit();
                 this._renderJournalTable(box, d, branch);
                 this.saveJournalLines();
             });
         });
 
-        // עריכת שדות (תיאור, סכום) — עדכון ללא re-render
+        // עריכת שדות (תיאור, סכום) — אחרי שינוי סכום בשורה שאינה הראשונה,
+        // השורה הראשונה תאוזן אוטומטית כדי שהיומן יישאר מאוזן
         box.querySelectorAll('.jl-fld').forEach(input => {
             input.addEventListener('change', () => {
                 const idx = parseInt(input.dataset.jli);
                 const fld = input.dataset.jlf;
                 const isNum = fld === 'debit' || fld === 'credit';
                 this.currentJournalLines[idx][fld] = isNum ? (parseFloat(input.value) || 0) : input.value;
+                if (isNum) {
+                    const firstDebitIdx = this.currentJournalLines.findIndex(l => l.type === 'debit');
+                    // אם השינוי לא בשורה הראשונה — מאזנים אותה ומעדכנים את ה-input המתאים
+                    if (firstDebitIdx >= 0 && idx !== firstDebitIdx) {
+                        this._rebalanceFirstDebit();
+                        const firstInput = box.querySelector(`.jl-fld[data-jli="${firstDebitIdx}"][data-jlf="debit"]`);
+                        if (firstInput) firstInput.value = parseFloat(this.currentJournalLines[firstDebitIdx].debit).toFixed(2);
+                    }
+                }
                 this._updateJournalTotals(box, d);
                 this.saveJournalLines();
             });
