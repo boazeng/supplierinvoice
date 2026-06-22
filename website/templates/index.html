@@ -63,6 +63,7 @@
         <section class="filter-tabs">
             <button class="tab active" data-status="" data-label="הכל" onclick="app.filterByStatus(this, '', '')">הכל</button>
             <button class="tab" data-status="pending_submission" data-label="קליטה" onclick="app.filterByStatus(this, 'pending_submission', '')">קליטה</button>
+            <button class="tab" data-status="draft_submitted" data-label="טיוטה" onclick="app.filterByStatus(this, 'draft_submitted', '')">טיוטה</button>
             <button class="tab" data-status="pending_filing" data-label="תיוק" onclick="app.filterByStatus(this, 'pending_filing', '')">תיוק</button>
             <button class="tab" data-status="on_hold" data-label="המתנה" onclick="app.filterByStatus(this, 'on_hold', '')">המתנה</button>
             <button class="tab" data-status="cancelled" data-label="בוטל" onclick="app.filterByStatus(this, 'cancelled', '')">בוטל</button>
@@ -129,7 +130,9 @@
                             <button id="btn-extract" class="btn btn-primary btn-sm" style="display:none"
                                     onclick="app.extractInvoice()">פענח</button>
                             <button id="btn-submit" class="btn btn-sm" style="display:none;border:1.5px solid #1F3A5F;color:#1F3A5F"
-                                    onclick="app.approveInvoice()">אשר וקלוט בפריורטי</button>
+                                    onclick="app.submitDraft()">קלוט טיוטה</button>
+                            <button id="btn-finalize" class="btn btn-success btn-sm" style="display:none"
+                                    onclick="app.finalizeInvoice()">קלוט סופי בפריורטי</button>
                             <button id="btn-file" class="btn btn-success btn-sm" style="display:none"
                                     onclick="app.fileToLedger()">תייק בספרי הנהלת חשבונות</button>
                             <button id="btn-restore" class="btn btn-primary btn-sm" style="display:none"

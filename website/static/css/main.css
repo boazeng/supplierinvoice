@@ -325,6 +325,7 @@ body {
 .status-pending_approval   { background: #B07D2B1f; color: #8A5F1E; }
 .status-pending_extraction { background: #B07D2B1f; color: #8A5F1E; }
 .status-pending_submission { background: #1F3A5F18; color: #1F3A5F; }
+.status-draft_submitted    { background: #2F8F5B28; color: #1F6B42; }
 .status-pending_filing     { background: #2F8F5B1f; color: #2F8F5B; }
 .status-on_hold            { background: #9B948624; color: #706A60; }
 .status-cancelled          { background: #D64A2E18; color: #D64A2E; }

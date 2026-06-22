@@ -1157,6 +1157,49 @@ async def approve_invoice(invoice_id: str, background_tasks: BackgroundTasks, bo
     }
 
 
+@app.post("/api/invoices/{invoice_id}/submit-draft")
+async def submit_draft_to_priority(invoice_id: str, body: dict = Body(default={})):
+    """שלב 1: שולח ל-OData ומקבל T-number — ללא CLOSEPRINTPIV."""
+    invoice = store.get(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+    if invoice.status != InvoiceStatus.PENDING_SUBMISSION:
+        raise HTTPException(status_code=400, detail=f"לא ניתן לקלוט טיוטה בסטטוס {invoice.status.value}")
+
+    invoice.user_notes = body.get("notes", "")
+    try:
+        invoice = await submit_invoice_odata_only(invoice, priority_client, store)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not invoice.priority_invoice_id:
+        return {"id": invoice.id, "status": invoice.status.value, "priority_invoice_id": "", "message": invoice.error_message or "שגיאה בקליטת טיוטה"}
+
+    invoice.status = InvoiceStatus.DRAFT_SUBMITTED
+    invoice.updated_at = datetime.now().isoformat()
+    store.save(invoice)
+    logger.info("טיוטה נקלטה — %s IVNUM: %s", invoice.id[:8], invoice.priority_invoice_id)
+
+    return {"id": invoice.id, "status": invoice.status.value, "priority_invoice_id": invoice.priority_invoice_id, "message": f"טיוטה נקלטה בפריורטי — {invoice.priority_invoice_id}"}
+
+
+@app.post("/api/invoices/{invoice_id}/finalize")
+async def finalize_draft(invoice_id: str, background_tasks: BackgroundTasks):
+    """שלב 2: מריץ CLOSEPRINTPIV על T-number קיים."""
+    invoice = store.get(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+    if invoice.status != InvoiceStatus.DRAFT_SUBMITTED:
+        raise HTTPException(status_code=400, detail=f"לא ניתן לסגור חשבונית בסטטוס {invoice.status.value}")
+    if not invoice.priority_invoice_id or not _is_temp_ivnum(invoice.priority_invoice_id):
+        raise HTTPException(status_code=400, detail="לא נמצא T-number תקין — לא ניתן לסגור")
+
+    background_tasks.add_task(finalize_invoice_background, invoice.id, priority_client, store)
+    logger.info("קליטה סופית תוזמנה ברקע — %s IVNUM: %s", invoice.id[:8], invoice.priority_invoice_id)
+
+    return {"id": invoice.id, "status": "pending_filing", "priority_invoice_id": invoice.priority_invoice_id, "message": "קליטה סופית בתהליך — תסגר תוך מספר דקות"}
+
+
 # מעברי סטטוס ידניים — אישור, החזרה לאישור, העברה להמתנה, ביטול
 _MANUAL_STATUS = {
     "pending_approval": InvoiceStatus.PENDING_APPROVAL,      # החזרה לאישור (מהמתנה/בוטל)

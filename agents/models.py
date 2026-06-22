@@ -15,6 +15,7 @@ class InvoiceStatus(str, Enum):
     PENDING_APPROVAL = "pending_approval"        # ממתין לאישור — הובא מהמייל
     PENDING_EXTRACTION = "pending_extraction"    # ממתין לפענוח — ברשימה, טרם פוענח
     PENDING_SUBMISSION = "pending_submission"    # ממתין לקליטה — פוענח, טרם נקלט בפריורטי
+    DRAFT_SUBMITTED = "draft_submitted"          # טיוטה בפריורטי — T-number קיים, לפני קליטה סופית
     PENDING_FILING = "pending_filing"            # ממתין לתיוק — נקלט בפריורטי, טרם תויק
     FILED = "filed"                              # תויק בספרי הנהלת חשבונות
     ON_HOLD = "on_hold"                          # בהמתנה — הועבר להמשך טיפול

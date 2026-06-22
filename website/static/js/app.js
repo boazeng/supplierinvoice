@@ -122,6 +122,7 @@ const app = {
             pending_approval: 'ממתין לאישור',
             pending_extraction: 'ממתין לפענוח',
             pending_submission: 'ממתין לקליטה',
+            draft_submitted: 'טיוטה בפריורטי',
             pending_filing: 'ממתין לתיוק',
             on_hold: 'בהמתנה',
             cancelled: 'בוטל',
@@ -147,7 +148,9 @@ const app = {
             const date = inv.created_at
                 ? new Date(inv.created_at).toLocaleDateString('he-IL')
                 : '';
-            const priorityId = inv.priority_invoice_id && !inv.priority_invoice_id.toUpperCase().startsWith('T')
+            const showPid = inv.priority_invoice_id &&
+                (!inv.priority_invoice_id.toUpperCase().startsWith('T') || inv.status === 'draft_submitted');
+            const priorityId = showPid
                 ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${inv.priority_invoice_id}</div>`
                 : '';
 
@@ -238,7 +241,7 @@ const app = {
                 const el = document.getElementById(id);
                 if (el) el.style.display = 'none';
             };
-            ['btn-approve-intake', 'btn-extract', 'btn-submit', 'btn-file',
+            ['btn-approve-intake', 'btn-extract', 'btn-submit', 'btn-finalize', 'btn-file',
              'btn-restore', 'btn-hold', 'btn-clear-extraction'].forEach(hideBtn);
             document.getElementById('validation-warnings').style.display = 'none';
             return;
@@ -393,10 +396,11 @@ const app = {
         actionBtns.style.display = 'flex';
         showBtn('btn-approve-intake', false);
         showBtn('btn-extract', false);
-        showBtn('btn-submit', s === 'pending_submission' || s === 'pending_extraction');
+        showBtn('btn-submit', s === 'pending_submission');
+        showBtn('btn-finalize', s === 'draft_submitted');
         showBtn('btn-file', s === 'pending_filing');
         showBtn('btn-restore', s === 'on_hold' || s === 'cancelled');
-        showBtn('btn-hold', s !== 'on_hold' && s !== 'cancelled');
+        showBtn('btn-hold', s !== 'on_hold' && s !== 'cancelled' && s !== 'draft_submitted');
         showBtn('btn-clear-extraction', true);   // יש נתוני פענוח — אפשר למחוק אותם
 
     },
@@ -1281,63 +1285,84 @@ const app = {
         }
     },
 
-    async approveInvoice() {
-        if (!this.currentInvoice) return;
-
-        // ולידציה: פקודת יומן חייבת להיות מאוזנת לפני קליטה בפריורטי
+    _validateJournalBeforeSubmit() {
         const jLines = this.currentJournalLines;
-        if (jLines && jLines.length > 0) {
-            const money = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const totDr = jLines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0);
-            const totCr = jLines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
-            if (Math.abs(totDr - totCr) > 0.01) {
-                this.showToast(`פקודת יומן לא מאוזנת — חובה ₪${money(totDr)} זכות ₪${money(totCr)}`, 'error');
-                return;
-            }
-            const invTot = parseFloat(this.currentInvoice.extracted_data && this.currentInvoice.extracted_data.total_amount) || 0;
-            if (invTot > 0 && Math.abs(totCr - invTot) > 0.51) {
-                const ok = confirm(`סה"כ פקודת יומן ₪${money(totCr)} שונה מסה"כ חשבונית ₪${money(invTot)}.\nלהמשיך בכל זאת?`);
-                if (!ok) return;
-            }
+        if (!jLines || jLines.length === 0) return true;
+        const money = n => parseFloat(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const totDr = jLines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0);
+        const totCr = jLines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+        if (Math.abs(totDr - totCr) > 0.01) {
+            this.showToast(`פקודת יומן לא מאוזנת — חובה ₪${money(totDr)} זכות ₪${money(totCr)}`, 'error');
+            return false;
         }
+        const invTot = parseFloat(this.currentInvoice.extracted_data && this.currentInvoice.extracted_data.total_amount) || 0;
+        if (invTot > 0 && Math.abs(totCr - invTot) > 0.51) {
+            return confirm(`סה"כ פקודת יומן ₪${money(totCr)} שונה מסה"כ חשבונית ₪${money(invTot)}.\nלהמשיך בכל זאת?`);
+        }
+        return true;
+    },
+
+    async submitDraft() {
+        if (!this.currentInvoice) return;
+        if (!this._validateJournalBeforeSubmit()) return;
 
         const notes = document.getElementById('user-notes')?.value || '';
         const btn = document.getElementById('btn-submit');
-
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = '⏳ שולח לפריורטי...';
-        }
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח טיוטה...'; }
 
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min
-            const res = await fetch(`/api/invoices/${this.currentInvoice.id}/approve`, {
+            const res = await fetch(`/api/invoices/${this.currentInvoice.id}/submit-draft`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ notes }),
-                signal: controller.signal,
             });
-            clearTimeout(timeoutId);
             let data;
             try { data = await res.json(); } catch { data = {}; }
             if (!res.ok) {
                 this.showToast(data.detail || data.message || `שגיאת שרת ${res.status}`, 'error');
-                if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
+                if (btn) { btn.disabled = false; btn.textContent = 'קלוט טיוטה'; }
                 return;
             }
-            if (data.status === 'pending_filing') {
-                this.showToast('החשבונית נקלטה בפריורטי בהצלחה!', 'success');
+            if (data.status === 'draft_submitted') {
+                this.showToast(`טיוטה נקלטה — ${data.priority_invoice_id}`, 'success');
                 this.closeModal();
                 this.loadInvoices();
             } else {
-                this.showToast(data.message || 'שגיאה בקליטה בפריורטי', 'error');
-                if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
+                this.showToast(data.message || 'שגיאה בקליטת טיוטה', 'error');
+                if (btn) { btn.disabled = false; btn.textContent = 'קלוט טיוטה'; }
             }
         } catch (err) {
             this.showToast(`שגיאת תקשורת: ${err.message || err}`, 'error');
-            if (btn) { btn.disabled = false; btn.textContent = 'אשר וקלוט בפריורטי'; }
+            if (btn) { btn.disabled = false; btn.textContent = 'קלוט טיוטה'; }
         }
+    },
+
+    async finalizeInvoice() {
+        if (!this.currentInvoice) return;
+        const btn = document.getElementById('btn-finalize');
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ מסגר...'; }
+
+        try {
+            const res = await fetch(`/api/invoices/${this.currentInvoice.id}/finalize`, { method: 'POST' });
+            let data;
+            try { data = await res.json(); } catch { data = {}; }
+            if (!res.ok) {
+                this.showToast(data.detail || data.message || `שגיאת שרת ${res.status}`, 'error');
+                if (btn) { btn.disabled = false; btn.textContent = 'קלוט סופי בפריורטי'; }
+                return;
+            }
+            this.showToast('קליטה סופית בתהליך — תסגר תוך מספר דקות', 'success');
+            this.closeModal();
+            this.loadInvoices();
+        } catch (err) {
+            this.showToast(`שגיאת תקשורת: ${err.message || err}`, 'error');
+            if (btn) { btn.disabled = false; btn.textContent = 'קלוט סופי בפריורטי'; }
+        }
+    },
+
+    async approveInvoice() {
+        // kept for backward compat — same as submitDraft
+        return this.submitDraft();
     },
 
     async rejectInvoice() {
