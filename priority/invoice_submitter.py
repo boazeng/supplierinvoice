@@ -40,24 +40,34 @@ async def _attach_invoice_file(
 
 
 def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
-    """מחלץ קוד ספק ופריטים מפקודת היומן הנערכת.
-    מחזיר (supplier_code, items) כאשר items הם PINVOICEITEMS_SUBFORM.
-    קוד הספק נלקח תמיד מנתוני הפענוח (priority_supplier_code), לא מפקודת היומן.
+    """מחלץ קוד ספק ופריטים מפקודת היומן הנערכת לטובת PINVOICEITEMS_SUBFORM.
 
-    מדיניות: השדות שנשלחים ל-Priority חייבים להגיע מהמשתמש כמו שהם —
-    בלי fallback שקט. חסר תיאור/סכום → ValueError עם הודעה מפורשת."""
+    אנחנו תמיד שולחים רק את שורות החיוב (לא את שורת המע"מ) ובלי VATFLAG —
+    Priority מחשב את ה-18% מע"מ אוטומטית מתוך ה-PRICE של כל פריט.
+
+    במצב 2/3 (רכב): שורת חיוב 1 בממשק מציגה את ה-1/3 הלא-מנוכה (subtotal +
+    vatNd). את ה-vatNd צריך לקזז לפני שליחה ל-Priority — אחרת Priority יחשב
+    18% על סכום מנופח ויקבל סה"כ שגוי. אז אנחנו מורידים אותו מהשורה הראשונה
+    כך ש-PRICE של כל הפריטים יסתכם ב-subtotal הנטו. Priority יחזיר 18% מע"מ
+    מלא — שמתאים לתיק החשבונאי (הספק חייב את העסק בכלל המע"מ). אם הספק
+    מוגדר ב-Priority עם FNCPATNAME=2/3, יומן ה-FNCTRANS יפצל אוטומטית 2/3
+    למע"מ ו-1/3 להוצאה."""
     jl = getattr(data, 'journal_lines', None) or []
     vat_type = getattr(data, 'vat_type', 'full') or 'full'
 
-    # 2/3 VAT: send expense rows AND the explicit VAT row so Priority books exact amounts.
-    # Other types: only expense rows; Priority auto-computes VAT from item prices.
-    include_types = {'debit', 'vat'} if vat_type == 'two_thirds' else {'debit'}
-    debit_rows = [l for l in jl if l.get('type') in include_types]
-
-    if not any(l.get('type') == 'debit' for l in debit_rows):
+    # רק שורות חיוב (לא vat — Priority יחשב אוטומטית)
+    debit_rows = [l for l in jl if l.get('type') == 'debit']
+    if not debit_rows:
         raise ValueError("אין שורות חיוב בפקודת היומן — יש להזין לפחות שורה אחת לפני הקליטה")
 
     supplier_code = data.supplier.priority_supplier_code
+
+    # ב-2/3 — לחשב כמה לקזז משורת חיוב 1 (=ה-vatNd שהוסף ע"י הרצת ה-rebalance בממשק)
+    first_debit_offset = 0.0
+    if vat_type == 'two_thirds':
+        vat_full = float(getattr(data, 'vat_amount', 0) or 0)
+        vat_ded  = round(vat_full * 2 / 3, 2)
+        first_debit_offset = round(vat_full - vat_ded, 2)  # החלק הלא-מנוכה
 
     items = []
     for i, ln in enumerate(debit_rows, 1):
@@ -68,20 +78,21 @@ def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
         if debit_val in (None, '', 0):
             raise ValueError(f"שורת חיוב {i} ללא סכום — יש להזין סכום לפני הקליטה")
         account = (ln.get('account') or '').strip()
-        account_label = 'חשבון מע"מ' if ln.get('type') == 'vat' else 'חשבון הוצאות'
         if not account:
-            raise ValueError(f"שורת חיוב {i} ללא {account_label} — יש להזין חשבון לפני הקליטה")
-        item: dict = {
+            raise ValueError(f"שורת חיוב {i} ללא חשבון הוצאות — יש להזין חשבון לפני הקליטה")
+        price = float(debit_val)
+        if i == 1 and first_debit_offset > 0:
+            # מקזזים את ה-1/3 הלא-מנוכה מהשורה הראשונה כדי שה-PRICE שיישלח
+            # יהיה נטו אמיתי. סך כל ה-PRICEs יהיה subtotal; Priority יחשב VAT
+            # מלא ויקבל סה"כ נכון.
+            price = max(0.0, round(price - first_debit_offset, 2))
+        items.append({
             "PARTNAME": "000",
             "PDES": desc[:100],
             "TQUANT": 1,
-            "PRICE": float(debit_val),
+            "PRICE": price,
             "ACCNAME": account,
-        }
-        if vat_type == 'two_thirds':
-            # Explicit amounts — tell Priority not to add auto-VAT on top of these lines
-            item["VATFLAG"] = "N"
-        items.append(item)
+        })
 
     return supplier_code, items
 
