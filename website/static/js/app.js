@@ -192,6 +192,8 @@ const app = {
             const modal = document.getElementById('invoice-modal');
             modal.style.display = 'flex';
             this.toggleFullscreen(false);
+            // איפוס כפתורי הסרגל לפני הרינדור (אם נשארו במצב "⏳ ..." מסבב קודם)
+            this._resetToolbarButtons();
 
             // render אחרי שה-modal visible כדי שה-iframe יטען
             this.renderModal(invoice);
@@ -411,8 +413,29 @@ const app = {
         this.isFullscreen = false;
         this._cleanupHighlight();
 
+        // איפוס מצב כפתורי הסרגל — מנעט מצב "תקוע" ב-"⏳ שולח טיוטה..." בפתיחה הבאה.
+        this._resetToolbarButtons();
+
         document.getElementById('invoice-modal').style.display = 'none';
         this.currentInvoice = null;
+    },
+
+    _resetToolbarButtons() {
+        const restore = (id, label) => {
+            const b = document.getElementById(id);
+            if (!b) return;
+            b.disabled = false;
+            // משאירים אלמנטים פנימיים אם יש (כמו svg) — אבל כפתורי הטולבר הם טקסט בלבד
+            b.textContent = label;
+        };
+        restore('btn-submit',     'קלוט טיוטה');
+        restore('btn-finalize',   'קלוט סופי בפריורטי');
+        restore('btn-reextract',  'פענוח חוזר');
+        restore('btn-extract',    'פענח');
+        restore('btn-ocr-test',   '🔍 קרא ספק');
+        restore('btn-ocr-supplier',   'קרא ספק');
+        restore('btn-ocr-customer',   'קרא לקוח');
+        restore('btn-ocr-allocation', 'קרא הקצאה');
     },
 
     // תצוגה מקדימה של תנועת היומן — ניתנת לעריכה מלאה
