@@ -16,8 +16,24 @@ async def _attach_invoice_file(
     ivnum: str,
     file_path: str,
 ) -> None:
-    """מצרף את קובץ ה-PDF של החשבונית ל-EXTFILES של PINVOICES ב-Priority."""
+    """מצרף את קובץ ה-PDF של החשבונית ל-EXTFILES של PINVOICES ב-Priority.
+    אם הקובץ (לפי EXTFILEDES = שם הקובץ) כבר מצורף — מדלגים, כדי למנוע כפילויות
+    כשמאמצים IVNUM קיים בעקבות דופליקציה."""
+    from pathlib import Path
     pinvoice_key = f"IVNUM='{ivnum}',IVTYPE='P',DEBIT='D'"
+    file_name = Path(file_path).name
+    try:
+        existing = await priority_client._get(
+            f"PINVOICES({pinvoice_key})",
+            params={"$expand": "EXTFILES_SUBFORM($select=EXTFILEDES)"},
+        )
+        already = {row.get("EXTFILEDES") for row in (existing or {}).get("EXTFILES_SUBFORM", [])}
+        if file_name in already:
+            logger.info("הקובץ %s כבר מצורף ל-%s — מדלגים על תיוק חוזר", file_name, ivnum)
+            return
+    except Exception as e:
+        # לא מצליח לבדוק → נמשיך ונצרף בכל זאת
+        logger.debug("בדיקת EXTFILES קיים נכשלה (ממשיכים לצירוף): %s", e)
     ok = await priority_client.attach_extfile("PINVOICES", pinvoice_key, file_path)
     if not ok:
         logger.warning("תיוק קובץ ב-EXTFILES נכשל — IVNUM: %s", ivnum)
