@@ -455,10 +455,13 @@ const app = {
                 debit: parseFloat(ln.total_price || ln.unit_price || 0), credit: 0,
             }));
             if (vatNd > 0) {
-                lines.push({ id: 'vat_nd', type: 'debit', account: expAcc, description: 'הוצאות רכב — מע"מ לא מוכר (1/3)', debit: vatNd, credit: 0 });
+                lines.push({ id: 'vat_nd', type: 'vat_nd', account: expAcc, description: 'הוצאות רכב — מע"מ לא מוכר (1/3)', debit: vatNd, credit: 0 });
             }
         } else {
-            lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: 'הוצאות', debit: subtotal + vatNd, credit: 0 });
+            lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: 'הוצאות', debit: subtotal, credit: 0 });
+            if (vatNd > 0) {
+                lines.push({ id: 'vat_nd', type: 'vat_nd', account: expAcc, description: 'הוצאות רכב — מע"מ לא מוכר (1/3)', debit: vatNd, credit: 0 });
+            }
         }
         if (vatDed > 0) {
             lines.push({ id: 'vat', type: 'vat', account: vatAcc, description: vatType === 'two_thirds' ? 'מע"מ תשומות 2/3' : 'מע"מ תשומות', debit: vatDed, credit: 0 });
@@ -480,7 +483,7 @@ const app = {
         const ep_sup = `/api/db/suppliers/journal-accounts?branch=${encodeURIComponent(branch)}`;
 
         const rowHtml = (l, i) => {
-            const isDr = l.type === 'debit', isVat = l.type === 'vat', isCr = l.type === 'credit';
+            const isDr = l.type === 'debit', isVat = l.type === 'vat' || l.type === 'vat_nd', isCr = l.type === 'credit';
             const safeAcc  = (l.account  || '').replace(/"/g, '&quot;');
             const safeDesc = (l.description || '').replace(/"/g, '&quot;');
 
