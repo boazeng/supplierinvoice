@@ -194,13 +194,8 @@ const app = {
             this.renderModal(invoice);
             this.renderTransactionPreview(invoice);
 
-            // אתחול ריבועים אחרי שהתמונה/PDF נטענת
-            setTimeout(() => {
-                this.initHighlightBox(invoice, 'supplier');
-                this.initHighlightBox(invoice, 'customer');
-                this.initHighlightBox(invoice, 'allocation');
-                this.setActiveHighlight('supplier');
-            }, 500);
+            // הקופסאות הצבעוניות מוסתרות כברירת מחדל — נחשפות בלחיצה על "ידני".
+            // (הפונקציה initHighlightBox רצה רק כשהמשתמש מפעיל מצב ידני)
         } catch (err) {
             this.showToast('שגיאה בטעינת חשבונית', 'error');
         }
@@ -788,6 +783,34 @@ const app = {
         if (btn) {
             const labels = { supplier: '🔍 קרא ספק', customer: '🔍 קרא לקוח', allocation: '🔍 קרא הקצאה' };
             btn.textContent = labels[target] || '🔍 קרא';
+        }
+    },
+
+    // === מצב ידני — מציג 3 ריבועי חיתוך + 3 כפתורי קריאה ===
+    toggleManualMode() {
+        if (!this.currentInvoice) return;
+        const supplierBox = document.getElementById('highlight-box-supplier');
+        const isOn = supplierBox && supplierBox.style.display === 'block';
+
+        const targets = ['supplier', 'customer', 'allocation'];
+        if (isOn) {
+            // כיבוי מצב ידני — הסתרת קופסאות וכפתורי קריאה
+            for (const t of targets) {
+                const box = document.getElementById(`highlight-box-${t}`);
+                if (box) box.style.display = 'none';
+                const btn = document.getElementById(`btn-ocr-${t}`);
+                if (btn) btn.style.display = 'none';
+            }
+            document.getElementById('btn-manual').classList.remove('is-active');
+        } else {
+            // הפעלת מצב ידני — אתחול קופסאות + הצגת כפתורי קריאה
+            for (const t of targets) {
+                this.initHighlightBox(this.currentInvoice, t);
+                const btn = document.getElementById(`btn-ocr-${t}`);
+                if (btn) btn.style.display = '';
+            }
+            this.setActiveHighlight('supplier');
+            document.getElementById('btn-manual').classList.add('is-active');
         }
     },
 
