@@ -89,6 +89,12 @@ async def admin_users_page():
     return HTMLResponse((TEMPLATES_DIR / "admin_users.html").read_text(encoding="utf-8"))
 
 
+@app.get("/recommendations", response_class=HTMLResponse, include_in_schema=False)
+async def recommendations_page():
+    """מסך מאגר המלצות לחשבון הוצאות."""
+    return HTMLResponse((TEMPLATES_DIR / "recommendations.html").read_text(encoding="utf-8"))
+
+
 @app.post("/api/deploy")
 async def github_deploy(request: Request):
     """GitHub webhook — git pull + systemctl restart בכל push."""

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מאגר המלצות חשבון הוצאות</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+        :root { --accent:#1F3A5F; --bg:#FAF9F5; --card:#FFFEFB; --text:#2A2A28;
+                --muted:#9B9486; --border:#E7E2D6; --danger:#D64A2E; --ok:#2F8F5B; }
+        * { box-sizing: border-box; }
+        body { font-family: Heebo, Arial, sans-serif; background: var(--bg);
+               color: var(--text); margin: 0; padding: 0; }
+        .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+        h1 { font-size: 1.3rem; margin: 0 0 12px; }
+        .card { background: var(--card); border-radius: 12px; padding: 20px;
+                box-shadow: 0 2px 12px rgba(0,0,0,.06); margin-bottom: 18px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: right; padding: 9px 8px; border-bottom: 1px solid var(--border);
+                 font-size: 0.88rem; }
+        th { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+        tr:hover { background: rgba(31, 58, 95, 0.03); }
+        .mono { font-family: 'Space Grotesk', monospace; direction: ltr; text-align: left; }
+        input, select { padding: 6px 8px; border: 1px solid var(--border);
+                        border-radius: 6px; font-family: inherit; font-size: 0.85rem; }
+        button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px;
+                 cursor: pointer; font-family: inherit; font-size: 0.82rem;
+                 background: var(--card); color: var(--muted); transition: all .15s; }
+        button:hover { background: rgba(31, 58, 95, 0.08); color: var(--accent); }
+        .btn-save { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+        .btn-save:hover { background: #2A4870; color: #fff; }
+        .btn-del { background: var(--card); color: var(--danger); border-color: var(--danger); font-size: 0.78rem; padding: 4px 10px; }
+        .btn-del:hover { background: var(--danger); color: #fff; }
+        .btn-add { background: var(--ok); color: #fff; border-color: var(--ok); font-weight: 600; padding: 8px 20px; }
+        .btn-add:hover { background: #267447; color: #fff; }
+        .row-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .row-form input { flex: 1; min-width: 120px; }
+        .msg { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; display: none; font-size: 0.85rem; }
+        .msg.ok { background: #dcfce7; color: #166534; }
+        .msg.err { background: #fee2e2; color: #991b1b; }
+        .stats { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; color: var(--muted); font-size: 0.85rem; }
+        .stats strong { color: var(--text); font-size: 1rem; }
+        .search-bar { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; }
+        .search-bar input { flex: 1; }
+        .badge-count { display: inline-block; background: rgba(31, 58, 95, 0.1); color: var(--accent);
+                       border-radius: 999px; padding: 2px 10px; font-size: 0.78rem; font-weight: 600; }
+        .empty { text-align: center; color: var(--muted); padding: 32px; }
+    </style>
+</head>
+<body>
+<header class="tact-bar">
+    <span class="tact-logo">
+        <span class="tact-logo-row">
+            <span class="tact-logo-mark">
+                <span class="tact-logo-seg"><span class="tact-logo-letter">T</span><span class="tact-logo-dot"></span></span>
+                <span class="tact-logo-seg"><span class="tact-logo-letter">A</span><span class="tact-logo-dot"></span></span>
+                <span class="tact-logo-seg"><span class="tact-logo-letter">C</span><span class="tact-logo-dot"></span></span>
+                <span class="tact-logo-seg"><span class="tact-logo-letter">T</span></span>
+            </span>
+            <span class="tact-logo-word">bookkeeping</span>
+        </span>
+    </span>
+    <nav class="tact-nav">
+        <a href="/">חשבוניות ספק</a>
+        <a href="/ledger">ספרי הנהלת חשבונות</a>
+        <a href="/recommendations" class="active">מאגר המלצות</a>
+        <a id="admin-link" href="/admin/users" style="display:none">ניהול משתמשים</a>
+    </nav>
+    <span class="tact-account">
+        <span id="current-user" class="tact-chip"></span>
+        <a href="/logout" class="tact-logout">התנתק</a>
+    </span>
+</header>
+
+<div class="wrap">
+    <h1>💡 מאגר המלצות חשבון הוצאות</h1>
+    <div id="msg" class="msg"></div>
+
+    <div class="stats">
+        <span>סה״כ המלצות במאגר: <strong id="stat-total">—</strong></span>
+        <span>סה״כ ספקים מזוהים: <strong id="stat-suppliers">—</strong></span>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top:0">חיפוש בהמלצות קיימות</h3>
+        <div class="search-bar">
+            <input id="search-input" type="text" placeholder="חיפוש לפי קוד ספק / חשבון / תיאור...">
+            <button onclick="load()">חפש</button>
+            <button onclick="document.getElementById('search-input').value=''; load();">נקה</button>
+        </div>
+        <table>
+            <thead><tr>
+                <th>קוד ספק</th>
+                <th>חשבון הוצאה</th>
+                <th>תיאור</th>
+                <th>סניף</th>
+                <th>שימושים</th>
+                <th>שימוש אחרון</th>
+                <th></th>
+            </tr></thead>
+            <tbody id="recs-body"></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top:0">הוספת המלצה ידנית</h3>
+        <div class="row-form">
+            <input id="new-supplier" type="text" placeholder="קוד ספק (Priority)">
+            <input id="new-account" type="text" placeholder="חשבון הוצאה (לדוגמה: 608-0-110)">
+            <input id="new-desc" type="text" placeholder="תיאור (לא חובה)">
+            <input id="new-branch" type="text" placeholder="סניף (לדוגמה: 110)" style="max-width:120px">
+            <button class="btn-add" onclick="addRec()">הוסף</button>
+        </div>
+        <p style="color:var(--muted); font-size:0.82rem; margin:10px 0 0">
+            הוספה ידנית תרשום שימוש חדש (×1) או תגדיל את ה-times_used אם הצמד כבר קיים.
+        </p>
+    </div>
+</div>
+
+<script src="/static/js/tact-header.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+function msg(text, ok=true){ const m=$('msg'); m.textContent=text; m.className='msg '+(ok?'ok':'err'); m.style.display=''; setTimeout(()=>m.style.display='none', 4000); }
+function fmtDate(iso){
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+    catch { return iso; }
+}
+async function load(){
+    const q = $('search-input').value.trim();
+    const url = q ? `/api/recommendations?q=${encodeURIComponent(q)}` : '/api/recommendations';
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const items = data.results || [];
+        $('stat-total').textContent = data.count ?? items.length;
+        $('stat-suppliers').textContent = new Set(items.map(x=>x.supplier_code)).size;
+        const body = $('recs-body');
+        if (!items.length){
+            body.innerHTML = '<tr><td colspan="7" class="empty">אין המלצות' + (q ? ` להתאמה ל"${q}"` : ' עדיין — הן יצטברו אוטומטית כשתשמרי חשבונות הוצאה בחשבוניות') + '</td></tr>';
+            return;
+        }
+        body.innerHTML = items.map(r => `
+            <tr data-id="${r.id}">
+                <td class="mono">${r.supplier_code || ''}</td>
+                <td class="mono"><input class="acc-edit" type="text" value="${(r.expense_account||'').replace(/"/g,'&quot;')}" style="width:140px"></td>
+                <td><input class="desc-edit" type="text" value="${(r.account_desc||'').replace(/"/g,'&quot;')}" style="width:100%"></td>
+                <td class="mono"><input class="branch-edit" type="text" value="${(r.branch||'').replace(/"/g,'&quot;')}" style="width:60px"></td>
+                <td><span class="badge-count">×${r.times_used}</span></td>
+                <td style="color:var(--muted); font-size:0.82rem">${fmtDate(r.last_used)}</td>
+                <td>
+                    <button class="btn-save" onclick="saveRow('${r.id}')">שמור</button>
+                    <button class="btn-del" onclick="delRow('${r.id}')">מחק</button>
+                </td>
+            </tr>`).join('');
+    } catch (e) { msg('שגיאה בטעינה: ' + e, false); }
+}
+async function saveRow(id){
+    const tr = document.querySelector(`tr[data-id="${id}"]`);
+    if (!tr) return;
+    const body = {
+        expense_account: tr.querySelector('.acc-edit').value.trim(),
+        account_desc:    tr.querySelector('.desc-edit').value.trim(),
+        branch:          tr.querySelector('.branch-edit').value.trim(),
+    };
+    if (!body.expense_account) { msg('חשבון לא יכול להיות ריק', false); return; }
+    try {
+        const res = await fetch(`/api/recommendations/${id}/update`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) { msg('שמירה נכשלה', false); return; }
+        msg('נשמר בהצלחה');
+        await load();
+    } catch (e) { msg('שגיאה: ' + e, false); }
+}
+async function delRow(id){
+    if (!confirm('למחוק את ההמלצה?')) return;
+    try {
+        const res = await fetch(`/api/recommendations/${id}/delete`, { method: 'POST' });
+        if (!res.ok) { msg('מחיקה נכשלה', false); return; }
+        msg('נמחק');
+        await load();
+    } catch (e) { msg('שגיאה: ' + e, false); }
+}
+async function addRec(){
+    const body = {
+        supplier_code:   $('new-supplier').value.trim(),
+        expense_account: $('new-account').value.trim(),
+        account_desc:    $('new-desc').value.trim(),
+        branch:          $('new-branch').value.trim(),
+    };
+    if (!body.supplier_code || !body.expense_account) { msg('קוד ספק וחשבון הוצאה — חובה', false); return; }
+    try {
+        const res = await fetch('/api/recommendations', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) { const d = await res.json().catch(()=>({})); msg(d.detail || 'הוספה נכשלה', false); return; }
+        msg('נוסף');
+        ['new-supplier','new-account','new-desc','new-branch'].forEach(id => $(id).value='');
+        await load();
+    } catch (e) { msg('שגיאה: ' + e, false); }
+}
+$('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
+load();
+</script>
+</body>
+</html>
