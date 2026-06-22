@@ -6,7 +6,7 @@
     <title>קליטת חשבוניות ספק</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/main.css?v=tact17">
+    <link rel="stylesheet" href="/static/css/main.css?v=tact18">
     <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
 </head>
 <body>
@@ -110,9 +110,6 @@
                         <button class="btn btn-sm" style="background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)" onclick="app.testOcrCrop(app.activeHighlight)" id="btn-ocr-test">
                             🔍 קרא ספק
                         </button>
-                        <button class="btn btn-sm" style="border:1.5px solid #1F3A5F;color:#1F3A5F" onclick="app.reextractInvoice()" id="btn-reextract">
-                            פענוח חוזר
-                        </button>
                         <!-- כפתורי פעולה — נראות לפי סטטוס (app.renderModal) -->
                         <div id="action-buttons" class="action-buttons">
                             <button id="btn-approve-intake" class="btn btn-success btn-sm" style="display:none"
@@ -130,6 +127,9 @@
                             <button id="btn-clear-extraction" class="btn btn-sm" style="border:1.5px solid #1F3A5F;color:#1F3A5F"
                                     onclick="app.clearExtraction()">מחק פענוח</button>
                         </div>
+                        <button class="btn btn-sm" style="border:1.5px solid #1F3A5F;color:#1F3A5F" onclick="app.reextractInvoice()" id="btn-reextract">
+                            פענוח חוזר
+                        </button>
                         <button id="expand-icon" title="מסך מלא" onclick="app.toggleBrowserFullscreen()"
                                 style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1">⛶</button>
                         <button class="modal-close" onclick="app.closeModal()">&times;</button>
