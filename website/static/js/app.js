@@ -462,7 +462,9 @@ const app = {
                 lines.push({ id: 'vat_nd', type: 'debit', account: expAcc, description: 'הוצאות רכב — מע"מ לא מוכר (1/3)', debit: vatNd, credit: 0 });
             }
         } else {
-            lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: 'הוצאות', debit: subtotal + vatNd, credit: 0 });
+            // total - vatDed מבטיח שהסכום הכולל יהיה בדיוק total_amount (ללא תלות בעיגולי subtotal)
+            const expDebit = vatDed > 0 ? Math.round((total - vatDed) * 100) / 100 : subtotal;
+            lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: 'הוצאות', debit: expDebit, credit: 0 });
         }
         if (vatDed > 0) {
             lines.push({ id: 'vat', type: 'vat', account: vatAcc, description: vatType === 'two_thirds' ? 'מע"מ תשומות 2/3' : 'מע"מ תשומות', debit: vatDed, credit: 0 });
