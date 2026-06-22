@@ -31,9 +31,14 @@ def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
     מדיניות: השדות שנשלחים ל-Priority חייבים להגיע מהמשתמש כמו שהם —
     בלי fallback שקט. חסר תיאור/סכום → ValueError עם הודעה מפורשת."""
     jl = getattr(data, 'journal_lines', None) or []
-    debit_rows = [l for l in jl if l.get('type') == 'debit']
+    vat_type = getattr(data, 'vat_type', 'full') or 'full'
 
-    if not debit_rows:
+    # 2/3 VAT: send expense rows AND the explicit VAT row so Priority books exact amounts.
+    # Other types: only expense rows; Priority auto-computes VAT from item prices.
+    include_types = {'debit', 'vat'} if vat_type == 'two_thirds' else {'debit'}
+    debit_rows = [l for l in jl if l.get('type') in include_types]
+
+    if not any(l.get('type') == 'debit' for l in debit_rows):
         raise ValueError("אין שורות חיוב בפקודת היומן — יש להזין לפחות שורה אחת לפני הקליטה")
 
     supplier_code = data.supplier.priority_supplier_code
@@ -47,15 +52,20 @@ def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
         if debit_val in (None, '', 0):
             raise ValueError(f"שורת חיוב {i} ללא סכום — יש להזין סכום לפני הקליטה")
         account = (ln.get('account') or '').strip()
+        account_label = 'חשבון מע"מ' if ln.get('type') == 'vat' else 'חשבון הוצאות'
         if not account:
-            raise ValueError(f"שורת חיוב {i} ללא חשבון הוצאות — יש להזין חשבון לפני הקליטה")
-        items.append({
+            raise ValueError(f"שורת חיוב {i} ללא {account_label} — יש להזין חשבון לפני הקליטה")
+        item: dict = {
             "PARTNAME": "000",
             "PDES": desc[:100],
             "TQUANT": 1,
             "PRICE": float(debit_val),
             "ACCNAME": account,
-        })
+        }
+        if vat_type == 'two_thirds':
+            # Explicit amounts — tell Priority not to add auto-VAT on top of these lines
+            item["VATFLAG"] = "N"
+        items.append(item)
 
     return supplier_code, items
 
