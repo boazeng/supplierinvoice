@@ -106,6 +106,13 @@
                     </span>
                     <h3 style="font-size:0.95rem;font-weight:600;margin:0">פרטי חשבונית</h3>
                     <div style="display:flex;align-items:center;gap:10px">
+                        <!-- כפתורי פעולת קובץ — תמיד גלויים -->
+                        <button class="btn btn-sm" style="background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)" onclick="app.testOcrCrop(app.activeHighlight)" id="btn-ocr-test">
+                            🔍 קרא ספק
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="app.reextractInvoice()" id="btn-reextract">
+                            🔄 פענוח חוזר
+                        </button>
                         <!-- כפתורי פעולה — נראות לפי סטטוס (app.renderModal) -->
                         <div id="action-buttons" class="action-buttons">
                             <button id="btn-approve-intake" class="btn btn-success btn-sm" style="display:none"
@@ -135,17 +142,6 @@
                 <div class="modal-body">
                     <!-- עמודה 1: תצוגת קובץ -->
                     <div class="preview-pane" id="preview-pane">
-                        <div class="preview-top-bar">
-                            <h3>קובץ מקור</h3>
-                            <div style="display:flex; gap:8px; align-items:center;">
-                                <button class="btn btn-sm" style="background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)" onclick="app.testOcrCrop(app.activeHighlight)" id="btn-ocr-test">
-                                    🔍 קרא ספק
-                                </button>
-                                <button class="btn btn-primary btn-sm" onclick="app.reextractInvoice()" id="btn-reextract">
-                                    🔄 פענוח חוזר
-                                </button>
-                            </div>
-                        </div>
                         <div class="preview-container" id="preview-container">
                             <iframe id="file-preview-iframe" class="file-preview" style="display:none"></iframe>
                             <img id="file-preview-img" class="file-preview" style="display:none; object-fit:contain" />
