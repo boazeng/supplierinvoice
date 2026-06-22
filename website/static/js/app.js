@@ -508,6 +508,8 @@ const app = {
         lines.push({ id: 'sup', type: 'credit', account: supAcc, description: (d.supplier && d.supplier.name) || 'ספק', debit: 0, credit: total });
         this.currentJournalLines = lines;
         this._rebalanceFirstDebit();
+        // השורות נבנו טרי מהפענוח — שומרים מיד בשרת כדי שהקליטה לא תמצא journal_lines ריק
+        this.saveJournalLines();
     },
 
     // מאזן את פקודת היומן — שורת החיוב הראשונה סופגת את ההפרש בין סה"כ זכות לסה"כ
@@ -1407,6 +1409,10 @@ const app = {
         if (btn) { btn.disabled = true; btn.textContent = '⏳ שולח טיוטה...'; }
 
         try {
+            // וידוא שכל השורות שמורות בשרת לפני קליטה (בולם race condition כש"submitDraft" נלחץ
+            // מיד אחרי פתיחת המודאל בלי שום עריכה — אז journal_lines בשרת עדיין ריק)
+            await this.saveJournalLines();
+
             const res = await fetch(`/api/invoices/${this.currentInvoice.id}/submit-draft`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
