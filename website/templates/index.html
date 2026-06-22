@@ -6,7 +6,7 @@
     <title>קליטת חשבוניות ספק</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/main.css?v=tact21">
+    <link rel="stylesheet" href="/static/css/main.css?v=tact22">
     <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
 </head>
 <body>
@@ -129,15 +129,15 @@
                         <button id="expand-icon" title="מסך מלא" onclick="app.toggleBrowserFullscreen()"
                                 style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1">⛶</button>
                         <button class="modal-close" onclick="app.closeModal()">&times;</button>
+                        <!-- "פענוח חוזר" — אחרי X, כך שהוא הכפתור השמאלי ביותר בסרגל (בגובה הכותרת, מעל ה-iframe) -->
+                        <button class="btn btn-sm" style="border:1.5px solid #1F3A5F;color:#1F3A5F;background:#FFFEFB" onclick="app.reextractInvoice()" id="btn-reextract">
+                            פענוח חוזר
+                        </button>
                     </div>
                 </div>
                 <div class="modal-body">
                     <!-- עמודה 1: תצוגת קובץ -->
                     <div class="preview-pane" id="preview-pane">
-                        <!-- "פענוח חוזר" — צף בפינה השמאלית-עליונה של תצוגת הקובץ, בגובה הסרגל העליון (מעל ה-3 קווים של PDF.js) -->
-                        <button class="btn btn-sm" style="position:absolute;top:-42px;left:8px;z-index:201;border:1.5px solid #1F3A5F;color:#1F3A5F;background:#FFFEFB;border-radius:999px;padding:6px 14px;font-size:0.82rem;font-weight:500;box-shadow:0 2px 8px rgba(31,58,95,0.12)" onclick="app.reextractInvoice()" id="btn-reextract">
-                            פענוח חוזר
-                        </button>
                         <div class="preview-container" id="preview-container">
                             <iframe id="file-preview-iframe" class="file-preview" style="display:none"></iframe>
                             <img id="file-preview-img" class="file-preview" style="display:none; object-fit:contain" />
