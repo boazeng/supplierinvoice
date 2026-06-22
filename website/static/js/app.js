@@ -244,7 +244,7 @@ const app = {
                 if (el) el.style.display = 'none';
             };
             ['btn-approve-intake', 'btn-extract', 'btn-submit', 'btn-file',
-             'btn-restore', 'btn-hold', 'btn-cancel', 'btn-clear-extraction'].forEach(hideBtn);
+             'btn-restore', 'btn-hold', 'btn-clear-extraction'].forEach(hideBtn);
             document.getElementById('validation-warnings').style.display = 'none';
             return;
         }
@@ -402,9 +402,7 @@ const app = {
         showBtn('btn-file', s === 'pending_filing');
         showBtn('btn-restore', s === 'on_hold' || s === 'cancelled');
         showBtn('btn-hold', s !== 'on_hold' && s !== 'cancelled');
-        showBtn('btn-cancel', s !== 'cancelled');
         showBtn('btn-clear-extraction', true);   // יש נתוני פענוח — אפשר למחוק אותם
-        // btn-delete-modal — תמיד גלוי
 
     },
 
