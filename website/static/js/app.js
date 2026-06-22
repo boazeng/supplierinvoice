@@ -1311,6 +1311,11 @@ const app = {
                 const updatedInv = await invRes.json();
                 this.currentInvoice = updatedInv;
                 this.renderModal(updatedInv);
+                // איפוס וייצור מחדש של פקודת היומן מהנתונים המעודכנים
+                // (אחרת המשתמש היה צריך לסגור ולפתוח את המודאל כדי לראות את היומן)
+                this._journalInvId = null;
+                this.currentJournalLines = [];
+                this.renderTransactionPreview(updatedInv);
 
                 // שחזור שני הריבועים
                 setTimeout(() => {
