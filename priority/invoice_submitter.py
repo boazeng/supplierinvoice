@@ -84,8 +84,11 @@ def _build_priority_payload(data: InvoiceData) -> dict:
     if data.allocation_number:
         payload["SDINUMIT"] = data.allocation_number
 
-    if data.fncpatname:
-        payload["FNCPATNAME"] = data.fncpatname
+    # הערה: FNCPATNAME (תבנית כספית — קובע 2/3 או חסמ) לא קיים כשדה על
+    # PINVOICES בהתקנה הזו (Priority ידחה עם 'property does not exist').
+    # Priority מסיק את הדפוס מהגדרת הספק (FNCSUP.FNCPATNAME). אם בעתיד
+    # נצטרך לדרוס לכל חשבונית — נחפש שדה ייחודי או נשנה את הגדרת הספק לפני
+    # הקליטה ולא נשלח אותו ב-payload של PINVOICES.
 
     return payload
 
