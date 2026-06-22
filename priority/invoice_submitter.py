@@ -254,24 +254,47 @@ async def submit_invoice_odata_only(
             except Exception:
                 detail = raw
 
-        is_duplicate = "כבר קיימת" in detail or "already exists" in detail.lower()
+        # זיהוי דופליקציה: Priority מחזיר 'קיימת כבר' / 'כבר קיימת' / 'already exists' —
+        # מספיק לחפש 'קיימת' או 'exists' כדי לתפוס את כל הוריאציות.
+        is_duplicate = "קיימת" in detail or "exists" in detail.lower()
         if is_duplicate:
             existing = await priority_client._get(
                 "PINVOICES",
                 params={
                     "$filter": f"BOOKNUM eq '{invoice.extracted_data.invoice_number}' and SUPNAME eq '{invoice.extracted_data.supplier.priority_supplier_code}'",
-                    "$select": "IVNUM,BOOKNUM,SUPNAME",
-                    "$top": "1",
+                    "$select": "IVNUM,BOOKNUM,SUPNAME,STATDES,STORNOFLAG",
+                    "$top": "10",
                 },
             )
-            ivnum = (existing or {}).get("value", [{}])[0].get("IVNUM", "") if existing else ""
-            if ivnum:
+            rows = (existing or {}).get("value", []) if existing else []
+            # מסננים החוצה רשומות מבוטלות (STORNOFLAG='Y' או STATDES='מבוטלת')
+            active = [r for r in rows
+                      if r.get("STORNOFLAG") != "Y"
+                      and (r.get("STATDES") or "") not in ("מבוטלת", "מבוטל")]
+            chosen = active[0] if active else None
+            if chosen:
+                ivnum = chosen.get("IVNUM", "")
                 invoice.priority_invoice_id = ivnum
                 invoice.error_message = ""
-                logger.info("חשבונית כבר קיימת — IVNUM: %s", ivnum)
-                # גם כאן — מצרפים את הקובץ לרשומה הקיימת
+                logger.info(
+                    "אומץ IVNUM קיים לאחר דופליקציה — %s (סטטוס: %s, סה\"כ רשומות: %d, מבוטלות: %d)",
+                    ivnum, chosen.get("STATDES"), len(rows), len(rows) - len(active),
+                )
+                # מצרפים את הקובץ לרשומה הקיימת
                 if invoice.file_path:
                     await _attach_invoice_file(priority_client, ivnum, invoice.file_path)
+            elif rows:
+                # כל הרשומות מבוטלות — Priority עדיין חוסם את המספר הזה.
+                # יש לבטל את הביטול ב-Priority, או להשתמש במספר חשבונית אחר.
+                cancelled_ivnums = ", ".join(r.get("IVNUM", "") for r in rows[:5])
+                invoice.status = InvoiceStatus.PENDING_SUBMISSION
+                invoice.error_message = (
+                    f"מספר החשבונית {invoice.extracted_data.invoice_number} "
+                    f"של ספק {invoice.extracted_data.supplier.priority_supplier_code} "
+                    f"קיים ב-Priority אך כל הרשומות מבוטלות ({cancelled_ivnums}). "
+                    f"יש לבטל את הביטול ב-Priority, או להשתמש במספר חשבונית שונה."
+                )
+                logger.warning("דופליקציה — כל הרשומות מבוטלות: %s", cancelled_ivnums)
             else:
                 invoice.status = InvoiceStatus.PENDING_SUBMISSION
                 invoice.error_message = f"שגיאה בקליטה: {detail}"
