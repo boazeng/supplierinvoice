@@ -416,12 +416,20 @@ body {
 .modal-toolbar .btn:active,
 .modal-toolbar .btn-sm:active,
 .modal-toolbar .btn.is-active {
-    background: #1F3A5F;
-    color: #F4F1EA;
-    border-color: #1F3A5F;
+    background: #1F3A5F !important;
+    color: #FFFFFF !important;
+    border-color: #1F3A5F !important;
     font-weight: 600;
     transform: none;
 }
+
+/* כפתורי קריאה צבעוניים (ספק/לקוח/הקצאה) — מסגרת בצבע התואם לריבוע ההדגשה */
+.modal-toolbar .btn-ocr-blue   { border: 1.5px solid #2196F3 !important; color: #2196F3 !important; }
+.modal-toolbar .btn-ocr-red    { border: 1.5px solid #f44336 !important; color: #f44336 !important; }
+.modal-toolbar .btn-ocr-green  { border: 1.5px solid #4CAF50 !important; color: #4CAF50 !important; }
+.modal-toolbar .btn-ocr-blue:hover  { background: rgba(33, 150, 243, 0.10) !important; color: #1976D2 !important; }
+.modal-toolbar .btn-ocr-red:hover   { background: rgba(244, 67, 54, 0.10) !important; color: #d32f2f !important; }
+.modal-toolbar .btn-ocr-green:hover { background: rgba(76, 175, 80, 0.10) !important; color: #388E3C !important; }
 /* כפתור X לסגירה — בלי גלולה */
 .modal-toolbar .modal-close,
 .modal-toolbar #expand-icon {

@@ -149,6 +149,19 @@ def find_by_name(name: str, company_type: Optional[str] = None) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def find_account_by_code(account_code: str) -> Optional[dict]:
+    """מחזיר חשבון לפי הקוד המדויק (account_code), או None."""
+    if not account_code:
+        return None
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT account_code, account_name, account_type FROM accounts WHERE account_code = ?",
+        (account_code,),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 def find_by_priority_code(code: str, company_type: str) -> Optional[dict]:
     """חיפוש לפי קוד פריורטי."""
     conn = get_connection()

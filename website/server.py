@@ -1349,6 +1349,28 @@ async def search_companies(
 
 # === מאגר המלצות לחשבון הוצאות ===
 
+def _enrich_recommendation(rec: dict) -> dict:
+    """מוסיף לרשומת המלצה: supplier_name (מ-companies) + account_name (מ-accounts)
+    בעדיפות על account_desc אם הוא ריק. לא דורס שדות קיימים."""
+    sup_code = rec.get("supplier_code") or ""
+    if sup_code:
+        sup = companies_db.find_by_priority_code(sup_code, "supplier")
+        rec["supplier_name"] = sup["name"] if sup else ""
+    else:
+        rec["supplier_name"] = ""
+
+    acc_code = rec.get("expense_account") or ""
+    if acc_code:
+        acc = companies_db.find_account_by_code(acc_code)
+        rec["account_name"] = acc["account_name"] if acc else ""
+        # אם account_desc ריק — נופלים לשם החשבון מטבלת accounts
+        if not (rec.get("account_desc") or "").strip() and acc:
+            rec["account_desc"] = acc["account_name"]
+    else:
+        rec["account_name"] = ""
+    return rec
+
+
 @app.get("/api/recommendations/expense-account/match")
 async def recommend_expense_account(
     supplier_code: str = Query(..., min_length=1),
@@ -1356,7 +1378,7 @@ async def recommend_expense_account(
     limit: int = Query(default=5, ge=1, le=20),
 ):
     """מחזיר עד `limit` המלצות לחשבון הוצאות עבור הספק (מסונן אופציונלית לסניף)."""
-    results = recs_db.match(supplier_code, branch=branch, limit=limit)
+    results = [_enrich_recommendation(r) for r in recs_db.match(supplier_code, branch=branch, limit=limit)]
     return {"supplier_code": supplier_code, "branch": branch, "results": results}
 
 
@@ -1366,7 +1388,8 @@ async def recommendations_list(
     limit: int = Query(default=500, ge=1, le=2000),
 ):
     """רשימת כל ההמלצות (לניהול). q מסנן לפי קוד ספק / חשבון / תיאור."""
-    return {"results": recs_db.list_all(q=q, limit=limit), "count": recs_db.count()}
+    results = [_enrich_recommendation(r) for r in recs_db.list_all(q=q, limit=limit)]
+    return {"results": results, "count": recs_db.count()}
 
 
 @app.post("/api/recommendations")

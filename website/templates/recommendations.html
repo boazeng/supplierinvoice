@@ -93,8 +93,9 @@
         <table>
             <thead><tr>
                 <th>קוד ספק</th>
+                <th>שם ספק</th>
                 <th>חשבון הוצאה</th>
-                <th>תיאור</th>
+                <th>שם / תיאור חשבון</th>
                 <th>סניף</th>
                 <th>שימושים</th>
                 <th>שימוש אחרון</th>
@@ -139,14 +140,15 @@ async function load(){
         $('stat-suppliers').textContent = new Set(items.map(x=>x.supplier_code)).size;
         const body = $('recs-body');
         if (!items.length){
-            body.innerHTML = '<tr><td colspan="7" class="empty">אין המלצות' + (q ? ` להתאמה ל"${q}"` : ' עדיין — הן יצטברו אוטומטית כשתשמרי חשבונות הוצאה בחשבוניות') + '</td></tr>';
+            body.innerHTML = '<tr><td colspan="8" class="empty">אין המלצות' + (q ? ` להתאמה ל"${q}"` : ' עדיין — הן יצטברו אוטומטית כשתשמרי חשבונות הוצאה בחשבוניות') + '</td></tr>';
             return;
         }
         body.innerHTML = items.map(r => `
             <tr data-id="${r.id}">
                 <td class="mono">${r.supplier_code || ''}</td>
+                <td style="font-size:0.82rem">${r.supplier_name || '<span style="color:var(--muted)">—</span>'}</td>
                 <td class="mono"><input class="acc-edit" type="text" value="${(r.expense_account||'').replace(/"/g,'&quot;')}" style="width:140px"></td>
-                <td><input class="desc-edit" type="text" value="${(r.account_desc||'').replace(/"/g,'&quot;')}" style="width:100%"></td>
+                <td><input class="desc-edit" type="text" value="${(r.account_desc||'').replace(/"/g,'&quot;')}" placeholder="${(r.account_name||'').replace(/"/g,'&quot;')}" style="width:100%"></td>
                 <td class="mono"><input class="branch-edit" type="text" value="${(r.branch||'').replace(/"/g,'&quot;')}" style="width:60px"></td>
                 <td><span class="badge-count">×${r.times_used}</span></td>
                 <td style="color:var(--muted); font-size:0.82rem">${fmtDate(r.last_used)}</td>
