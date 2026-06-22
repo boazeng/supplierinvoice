@@ -614,6 +614,9 @@ const app = {
                 </select>
                 <span style="flex:1"></span>
                 ${warnHtml}
+                <button id="btn-collapse-jl" class="btn btn-secondary btn-sm"
+                  style="font-size:0.8rem;padding:3px 10px;margin-inline-end:6px"
+                  title="מאחד את כל שורות החיוב לשורה אחת">שורה אחת</button>
                 <button id="btn-add-jl" class="btn btn-secondary btn-sm"
                   style="font-size:0.8rem;padding:3px 10px">＋ הוסף שורה</button>
             </div>
@@ -677,6 +680,30 @@ const app = {
             this._journalInvId = null;
             this.currentJournalLines = [];
             this._initJournalLines(d, branch);
+            this._renderJournalTable(box, d, branch);
+            this.saveJournalLines();
+        });
+
+        // איחוד כל שורות החיוב לשורה אחת ("שורה אחת")
+        box.querySelector('#btn-collapse-jl').addEventListener('click', () => {
+            const lines = this.currentJournalLines || [];
+            if (!lines.length) return;
+            const firstDebitIdx = lines.findIndex(l => l.type === 'debit');
+            if (firstDebitIdx < 0) return;
+            // סוכמים את כל שורות החיוב
+            const sumDebit = lines
+                .filter(l => l.type === 'debit')
+                .reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+            // משאירים רק את הראשונה ומסירים את שאר שורות החיוב
+            const kept = lines.filter((l, i) => l.type !== 'debit' || i === firstDebitIdx);
+            // המקבילה לשורה הראשונה לאחר הסינון
+            const newFirstIdx = kept.findIndex(l => l.type === 'debit');
+            if (newFirstIdx >= 0) {
+                kept[newFirstIdx].debit = Math.round(sumDebit * 100) / 100;
+            }
+            this.currentJournalLines = kept;
+            // איזון — אם יש מע"מ/זכות שמשנה את התמונה, השורה הראשונה תספוג את ההפרש
+            this._rebalanceFirstDebit();
             this._renderJournalTable(box, d, branch);
             this.saveJournalLines();
         });
