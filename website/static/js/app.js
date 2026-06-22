@@ -430,7 +430,18 @@ const app = {
         // שורות שמורות מהשרת — עדיפות ראשונה
         if (d.journal_lines && d.journal_lines.length > 0) {
             this._journalInvId = this.currentInvoice && this.currentInvoice.id;
-            this.currentJournalLines = d.journal_lines.map(l => Object.assign({}, l));
+            // סינון שורות "vat_nd" ישנות (מע"מ לא מוכר) שנשמרו לפני התיקון —
+            // הסכום שלהן ייספג בשורת חיוב 1 דרך _rebalanceFirstDebit
+            const filtered = d.journal_lines.filter(l =>
+                l.id !== 'vat_nd' &&
+                !(l.description || '').includes('מע"מ לא מוכר')
+            );
+            this.currentJournalLines = filtered.map(l => Object.assign({}, l));
+            if (filtered.length !== d.journal_lines.length) {
+                // היו שורות שסוננו → מאזנים את שורת חיוב 1 ושומרים
+                this._rebalanceFirstDebit();
+                this.saveJournalLines();
+            }
             return;
         }
         // שורות מקומיות מאותה חשבונית — שמור עריכות בתהליך
@@ -462,7 +473,11 @@ const app = {
         } else {
             // total - vatDed מבטיח שהסכום הכולל יהיה בדיוק total_amount (ללא תלות בעיגולי subtotal)
             const expDebit = vatDed > 0 ? Math.round((total - vatDed) * 100) / 100 : subtotal;
-            lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: 'הוצאות', debit: expDebit, credit: 0 });
+            // התיאור של השורה הראשונה הוא מה שייכנס לשדה DETAILS בפריורטי —
+            // לוקחים את תיאור שורת החשבונית, ואם אין → שם הספק, ורק כברירת מחדל אחרונה "הוצאות"
+            const expDesc = (invLines[0] && invLines[0].description)
+                || (d.supplier && d.supplier.name) || 'הוצאות';
+            lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: expDesc, debit: expDebit, credit: 0 });
         }
         if (vatDed > 0) {
             lines.push({ id: 'vat', type: 'vat', account: vatAcc, description: vatType === 'two_thirds' ? 'מע"מ תשומות 2/3' : 'מע"מ תשומות', debit: vatDed, credit: 0 });
