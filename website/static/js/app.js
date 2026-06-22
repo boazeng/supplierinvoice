@@ -575,7 +575,15 @@ const app = {
             <div class="tx-card-footer" style="color:${balanced && totalOk ? 'var(--success)' : 'var(--danger)'}">
                 ${balanced && totalOk ? '✓ מאוזן' : (balanced ? '⚠ שונה מסה"כ חשבונית' : '⚠ לא מאוזן')}
             </div>
+            <!-- מאגר המלצות — מוצג רק אם יש לפחות המלצה אחת לספק זה -->
+            <div id="recs-bar" style="padding:6px 10px;border-top:1px solid var(--border);font-size:0.82rem;color:var(--text-secondary);display:none">
+                <span style="margin-inline-end:6px">💡 חשבונות שכבר השתמשת בהם לספק זה:</span>
+                <span id="recs-chips" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span>
+            </div>
         </div>`;
+
+        // טעינת המלצות חשבון הוצאות — אסינכרוני, לא חוסם
+        this._loadRecommendations(d, branch);
 
         // שינוי סוג מע"מ / סוג תנועה
         box.querySelector('#vat-type-sel').addEventListener('change', async (e) => {
@@ -783,6 +791,57 @@ const app = {
         if (btn) {
             const labels = { supplier: '🔍 קרא ספק', customer: '🔍 קרא לקוח', allocation: '🔍 קרא הקצאה' };
             btn.textContent = labels[target] || '🔍 קרא';
+        }
+    },
+
+    // === מאגר המלצות לחשבון הוצאות לפי ספק ===
+    async _loadRecommendations(d, branch) {
+        const supCode = ((d && d.supplier && d.supplier.priority_supplier_code) || '').trim();
+        const bar = document.getElementById('recs-bar');
+        const chips = document.getElementById('recs-chips');
+        if (!supCode || !bar || !chips) return;
+        try {
+            const res = await fetch(
+                `/api/recommendations/expense-account/match?supplier_code=${encodeURIComponent(supCode)}&branch=${encodeURIComponent(branch || '')}&limit=5`
+            );
+            const data = await res.json();
+            const items = (data.results || []).filter(r => r.expense_account);
+            if (!items.length) return;
+            chips.innerHTML = items.map(r => {
+                const acc = (r.expense_account || '').replace(/"/g, '&quot;');
+                const desc = (r.account_desc || '').replace(/"/g, '&quot;');
+                const tip = desc ? `${acc} — ${desc}` : acc;
+                return `<button class="rec-chip" data-acc="${acc}" title="${tip}"
+                          style="background:#FFFEFB;border:1px solid #E7E2D6;border-radius:999px;padding:3px 10px;cursor:pointer;font-size:0.78rem;color:#1F3A5F">
+                          ${acc} <span style="color:#706A60">×${r.times_used}</span>
+                        </button>`;
+            }).join('');
+            bar.style.display = '';
+            // לחיצה על המלצה — ממלא את שורת החיוב הראשונה
+            chips.querySelectorAll('.rec-chip').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const acc = btn.dataset.acc;
+                    if (!acc || !this.currentJournalLines) return;
+                    const idx = this.currentJournalLines.findIndex(l => l.type === 'debit');
+                    if (idx < 0) return;
+                    this.currentJournalLines[idx].account = acc;
+                    // עדכון מיידי של ה-DB ל-expense_account לטובת זיכרון לטווח ארוך
+                    if (this.currentInvoice) {
+                        fetch(`/api/invoices/${this.currentInvoice.id}/update-field`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path: 'expense_account', value: acc }),
+                        });
+                        if (this.currentInvoice.extracted_data)
+                            this.currentInvoice.extracted_data.expense_account = acc;
+                    }
+                    this.saveJournalLines();
+                    // re-render כדי שהערך החדש יופיע בשדה
+                    const txBox = document.getElementById('transaction-preview');
+                    if (txBox) this._renderJournalTable(txBox, d, branch);
+                });
+            });
+        } catch (e) {
+            // נכשל בשקט — לא קריטי
         }
     },
 

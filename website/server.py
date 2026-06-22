@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends, Request, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends, Request, BackgroundTasks, Body
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -25,6 +25,7 @@ from tools.invoice_store import InvoiceStore
 from config.settings import INVOICES_DIR, BASE_DIR, DATA_DIR
 from database import db as companies_db
 from database import ledger_db
+from database import expense_recommendations_db as recs_db
 from database.sync import sync_all as sync_companies_from_priority
 
 logger = logging.getLogger("אתר.שרת")
@@ -643,7 +644,10 @@ async def update_invoice_field(invoice_id: str, body: dict = {}):
             sup_code = invoice.extracted_data.supplier.priority_supplier_code
             if sup_code and value:
                 companies_db.set_supplier_expense_account(sup_code, str(value))
-                logger.info("נשמר חשבון הוצאות %s לספק %s", value, sup_code)
+                # מאגר המלצות — רושם שימוש (supplier + account [+ branch]) לטובת המלצה עתידית
+                branch = (invoice.extracted_data.customer.branch or "") if invoice.extracted_data.customer else ""
+                recs_db.record(sup_code, str(value), branch=branch)
+                logger.info("נשמר חשבון הוצאות %s לספק %s (סניף %s) במאגר ההמלצות", value, sup_code, branch or "—")
 
         return {"ok": True, "path": path, "value": value}
     else:
@@ -652,7 +656,7 @@ async def update_invoice_field(invoice_id: str, body: dict = {}):
 
 @app.post("/api/invoices/{invoice_id}/journal-lines")
 async def update_journal_lines(invoice_id: str, body: dict = {}):
-    """שמירת שורות פקודת יומן שנערכו ידנית."""
+    """שמירת שורות פקודת יומן שנערכו ידנית. שורות חיוב נרשמות גם במאגר ההמלצות."""
     invoice = store.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
@@ -662,6 +666,17 @@ async def update_journal_lines(invoice_id: str, body: dict = {}):
     invoice.extracted_data.journal_lines = lines
     invoice.updated_at = datetime.now().isoformat()
     store.save(invoice)
+
+    # רישום במאגר ההמלצות — כל שורת חיוב (debit) שיש לה חשבון נכנסת כשימוש לזוג (ספק, חשבון, סניף)
+    sup_code = invoice.extracted_data.supplier.priority_supplier_code or ""
+    branch = (invoice.extracted_data.customer.branch or "") if invoice.extracted_data.customer else ""
+    if sup_code:
+        for ln in lines:
+            if ln.get("type") == "debit":
+                acc = (ln.get("account") or "").strip()
+                if acc:
+                    recs_db.record(sup_code, acc, account_desc=(ln.get("description") or "").strip(), branch=branch)
+
     return {"ok": True, "count": len(lines)}
 
 
@@ -1324,3 +1339,58 @@ async def search_companies(
     # חיפוש לפי שם
     results = companies_db.find_by_name(q, type)
     return {"results": results}
+
+
+# === מאגר המלצות לחשבון הוצאות ===
+
+@app.get("/api/recommendations/expense-account/match")
+async def recommend_expense_account(
+    supplier_code: str = Query(..., min_length=1),
+    branch: str = Query(default=""),
+    limit: int = Query(default=5, ge=1, le=20),
+):
+    """מחזיר עד `limit` המלצות לחשבון הוצאות עבור הספק (מסונן אופציונלית לסניף)."""
+    results = recs_db.match(supplier_code, branch=branch, limit=limit)
+    return {"supplier_code": supplier_code, "branch": branch, "results": results}
+
+
+@app.get("/api/recommendations")
+async def recommendations_list(
+    q: str = Query(default=""),
+    limit: int = Query(default=500, ge=1, le=2000),
+):
+    """רשימת כל ההמלצות (לניהול). q מסנן לפי קוד ספק / חשבון / תיאור."""
+    return {"results": recs_db.list_all(q=q, limit=limit), "count": recs_db.count()}
+
+
+@app.post("/api/recommendations")
+async def recommendations_add(body: dict = Body(default={})):
+    """הוספה ידנית של המלצה (או הגדלת times_used לצמד קיים)."""
+    sup = (body.get("supplier_code") or "").strip()
+    acc = (body.get("expense_account") or "").strip()
+    if not sup or not acc:
+        raise HTTPException(status_code=400, detail="supplier_code ו-expense_account חובה")
+    desc = (body.get("account_desc") or "").strip()
+    branch = (body.get("branch") or "").strip()
+    recs_db.record(sup, acc, account_desc=desc, branch=branch)
+    return {"ok": True}
+
+
+@app.post("/api/recommendations/{rec_id}/update")
+async def recommendations_update(rec_id: str, body: dict = Body(default={})):
+    ok = recs_db.update(
+        rec_id,
+        expense_account=(body.get("expense_account") or "").strip(),
+        account_desc=(body.get("account_desc") or "").strip(),
+        branch=(body.get("branch") or "").strip(),
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="המלצה לא נמצאה")
+    return {"ok": True}
+
+
+@app.post("/api/recommendations/{rec_id}/delete")
+async def recommendations_delete(rec_id: str):
+    if not recs_db.delete(rec_id):
+        raise HTTPException(status_code=404, detail="המלצה לא נמצאה")
+    return {"ok": True}

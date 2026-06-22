@@ -11,6 +11,7 @@ from agents.models import Invoice, InvoiceStatus
 from priority.priority_client import PriorityClient
 from tools.invoice_store import InvoiceStore
 from database import db as companies_db
+from database import expense_recommendations_db as recs_db
 
 logger = logging.getLogger("סוכן.תזמור")
 
@@ -37,14 +38,27 @@ def enrich_invoice_from_db(invoice: Invoice) -> None:
                 data.supplier.tax_id_type = match["tax_id_type"]
             if match.get("address"):
                 data.supplier.address = match["address"]
-            # חשבון הוצאות: DB גובר תמיד. אם אין ב-DB — מנקים הצעת AI (יש למלא ידנית)
-            saved = companies_db.get_supplier_expense_account(match["priority_code"])
-            if saved:
-                data.expense_account = saved
-                logger.info("חשבון הוצאות נטען מהיסטוריה: %s", saved)
+            # חשבון הוצאות — מאגר ההמלצות גובר על הצעת AI:
+            #   1. אם יש המלצה במאגר לפי (ספק[, סניף]) — נשתמש בה (לרוב אותו ספק = אותו חשבון).
+            #   2. כברירת מחדל אחורית, אם המאגר ריק — בודקים גם את הטבלה הישנה supplier_expense_accounts.
+            #   3. אם לא נמצא דבר — מנקים את הצעת ה-AI (יש למלא ידנית).
+            branch_for_rec = (data.customer.branch or "") if data.customer else ""
+            top_rec = recs_db.top(match["priority_code"], branch=branch_for_rec)
+            if top_rec:
+                data.expense_account = top_rec["expense_account"]
+                logger.info(
+                    "חשבון הוצאות מהמלצות: %s (×%d, confidence=%d%%, ספק %s סניף %s)",
+                    top_rec["expense_account"], top_rec["times_used"], top_rec["confidence"],
+                    match["priority_code"], branch_for_rec or "—",
+                )
             else:
-                data.expense_account = ""
-                logger.info("חשבון הוצאות לא נשמר לספק %s — נאפס (יש להזין ידנית)", match["priority_code"])
+                saved = companies_db.get_supplier_expense_account(match["priority_code"])
+                if saved:
+                    data.expense_account = saved
+                    logger.info("חשבון הוצאות נטען מהיסטוריה הישנה: %s", saved)
+                else:
+                    data.expense_account = ""
+                    logger.info("אין המלצה לספק %s — חשבון הוצאות יישאר ריק", match["priority_code"])
             # סוג תנועה ושיעור מע"מ לפי FNCSUP.FNCPATNAME
             fncpatname = companies_db.get_supplier_fncpatname(match["priority_code"])
             data.fncpatname = fncpatname

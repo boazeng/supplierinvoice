@@ -11,6 +11,7 @@ from priority.priority_client import PriorityClient
 from agents.orchestrator import Orchestrator
 from website.server import app, init_dependencies
 from database import db
+from database import expense_recommendations_db
 
 
 def main() -> None:
@@ -24,6 +25,7 @@ def main() -> None:
 
     # אתחול בסיס נתונים
     db.init_db()
+    expense_recommendations_db.init_db()
     logger.info("בסיס נתונים אותחל")
 
     # אתחול רכיבים
