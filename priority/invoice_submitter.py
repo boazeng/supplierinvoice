@@ -224,6 +224,10 @@ async def submit_invoice_odata_only(
         invoice.priority_invoice_id = result.get("IVNUM", "")
         invoice.error_message = ""
         logger.info("OData קלט חשבונית — IVNUM: %s", invoice.priority_invoice_id)
+        # מצרפים את ה-PDF ל-EXTFILES של PINVOICES כבר בשלב הטיוטה
+        # (השדות זמינים על T-number — לא צריך להמתין ל-CLOSEPRINTPIV)
+        if invoice.priority_invoice_id and invoice.file_path:
+            await _attach_invoice_file(priority_client, invoice.priority_invoice_id, invoice.file_path)
     except Exception as e:
         import httpx as _httpx
         import json as _json
@@ -255,6 +259,9 @@ async def submit_invoice_odata_only(
                 invoice.priority_invoice_id = ivnum
                 invoice.error_message = ""
                 logger.info("חשבונית כבר קיימת — IVNUM: %s", ivnum)
+                # גם כאן — מצרפים את הקובץ לרשומה הקיימת
+                if invoice.file_path:
+                    await _attach_invoice_file(priority_client, ivnum, invoice.file_path)
             else:
                 invoice.status = InvoiceStatus.PENDING_SUBMISSION
                 invoice.error_message = f"שגיאה בקליטה: {detail}"
