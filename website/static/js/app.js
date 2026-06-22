@@ -934,22 +934,28 @@ const app = {
         const onMouseDown = (e) => {
             if (e.target.classList.contains('resize-handle-br')) return;
             e.preventDefault();
-            const rect = container.getBoundingClientRect();
             startX = e.clientX;
             startY = e.clientY;
             startLeft = box.offsetLeft;
             startTop = box.offsetTop;
+            // "ננטרל" bottom/right ונעבוד רק עם top/left + width/height בפיקסלים,
+            // אחרת אתחול אחוזי + שינויי pixels בזמן גרירה גורם להתנגשות (התקיעה בתחתית).
+            box.style.bottom = 'auto';
+            box.style.right = 'auto';
+            box.style.width = box.offsetWidth + 'px';
+            box.style.height = box.offsetHeight + 'px';
+            box.style.top = startTop + 'px';
+            box.style.left = startLeft + 'px';
 
             const onMouseMove = (e) => {
                 const dx = e.clientX - startX;
                 const dy = e.clientY - startY;
                 let newLeft = startLeft + dx;
                 let newTop = startTop + dy;
-                // bounds
+                // bounds — נשארים בתוך ה-preview-container (אזור ה-iframe)
                 newLeft = Math.max(0, Math.min(newLeft, container.clientWidth - box.offsetWidth));
                 newTop = Math.max(0, Math.min(newTop, container.clientHeight - box.offsetHeight));
                 box.style.left = newLeft + 'px';
-                box.style.right = 'auto';
                 box.style.top = newTop + 'px';
             };
 
@@ -977,19 +983,24 @@ const app = {
             const startW = box.offsetWidth;
             const startH = box.offsetHeight;
             const startLeft = box.offsetLeft;
+            const startTop = box.offsetTop;
+            // נעבור לקואורדינטות פיקסלים מוחלטות לפני הריסייז — אחרת
+            // bottom:8px (מהאתחול) ייצור התנגשות עם height החדש.
+            box.style.bottom = 'auto';
+            box.style.right = 'auto';
+            box.style.top = startTop + 'px';
+            box.style.left = startLeft + 'px';
 
             const onMouseMove = (e) => {
                 const dx = e.clientX - startX;
                 const dy = e.clientY - startY;
 
-                // כיוון RTL: גרירה ימינה מקטינה רוחב, שמאלה מגדילה
-                // הנקודה בצד ימין-למטה, אז שינוי רוחב = הזזת הצד הימני
-                // צד שמאל (left) נשאר קבוע, רוחב משתנה עם dx
+                // הנקודה בפינה ימין-למטה — שינוי רוחב/גובה מהמיקום הזה
                 let newW = startW + dx;
                 let newH = startH + dy;
 
                 newW = Math.max(40, Math.min(newW, container.clientWidth - startLeft));
-                newH = Math.max(20, Math.min(newH, container.clientHeight - box.offsetTop));
+                newH = Math.max(20, Math.min(newH, container.clientHeight - startTop));
 
                 box.style.width = newW + 'px';
                 box.style.height = newH + 'px';
