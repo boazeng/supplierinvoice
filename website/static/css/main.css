@@ -369,10 +369,80 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-tertiary);
+    gap: 18px;
+    padding: 10px 24px;
+    background: #FFFEFB;
+    border-bottom: 1px solid #E7E2D6;
+    box-shadow: 0 1px 8px rgba(28, 27, 25, 0.05);
+    color: #2A2A28;
+    font-family: 'Heebo', 'Assistant', 'Segoe UI', Tahoma, sans-serif;
     flex-shrink: 0;
+}
+
+/* כפתורי הסרגל — סגנון "גלולה צפה" של TACT */
+.modal-toolbar .btn,
+.modal-toolbar .btn-sm {
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    line-height: 1;
+    border: 1px solid #E7E2D6;
+    background: #FFFEFB;
+    color: #706A60;
+    box-shadow: 0 1px 3px rgba(31, 58, 95, 0.06);
+    transition: background .15s ease, color .15s ease, transform .15s ease;
+    white-space: nowrap;
+}
+.modal-toolbar .btn:hover,
+.modal-toolbar .btn-sm:hover {
+    background: #F1EFE8;
+    color: #1F3A5F;
+    transform: translateY(-1px);
+}
+/* פעולה ראשית — מילוי steel */
+.modal-toolbar .btn-primary,
+.modal-toolbar .btn-success {
+    background: #1F3A5F;
+    color: #F4F1EA;
+    border-color: #1F3A5F;
+    font-weight: 600;
+}
+.modal-toolbar .btn-primary:hover,
+.modal-toolbar .btn-success:hover {
+    background: #2A4870;
+    color: #F4F1EA;
+}
+/* פעולה הרסנית — מילוי rust */
+.modal-toolbar .btn-danger {
+    background: #D64A2E;
+    color: #FFFEFB;
+    border-color: #D64A2E;
+    font-weight: 600;
+}
+.modal-toolbar .btn-danger:hover {
+    background: #BF3F25;
+    color: #FFFEFB;
+}
+/* כפתור X לסגירה — בלי גלולה */
+.modal-toolbar .modal-close,
+.modal-toolbar #expand-icon {
+    border-radius: 999px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #706A60;
+    box-shadow: none;
+}
+.modal-toolbar .modal-close:hover,
+.modal-toolbar #expand-icon:hover {
+    background: #F1EFE8;
+    color: #1F3A5F;
 }
 
 .modal-close {
