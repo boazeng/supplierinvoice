@@ -6,7 +6,7 @@
     <title>קליטת חשבוניות ספק</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/main.css?v=tact15">
+    <link rel="stylesheet" href="/static/css/main.css?v=tact16">
     <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
 </head>
 <body>
@@ -119,18 +119,18 @@
                                     onclick="app.changeStatus('pending_extraction','אושר לפענוח')">אשר</button>
                             <button id="btn-extract" class="btn btn-primary btn-sm" style="display:none"
                                     onclick="app.extractInvoice()">פענח</button>
-                            <button id="btn-submit" class="btn btn-success btn-sm" style="display:none"
+                            <button id="btn-submit" class="btn btn-sm" style="display:none;border:1.5px solid #1F3A5F;color:#1F3A5F"
                                     onclick="app.approveInvoice()">אשר וקלוט בפריורטי</button>
                             <button id="btn-file" class="btn btn-success btn-sm" style="display:none"
                                     onclick="app.fileToLedger()">תייק בספרי הנהלת חשבונות</button>
                             <button id="btn-restore" class="btn btn-primary btn-sm" style="display:none"
                                     onclick="app.changeStatus('pending_approval','הוחזר לאישור')">החזר לאישור</button>
-                            <button id="btn-hold" class="btn btn-sm" style="display:none;background:var(--text-muted);color:#fff"
+                            <button id="btn-hold" class="btn btn-sm" style="display:none;border:1.5px solid #1F3A5F;color:#1F3A5F"
                                     onclick="app.changeStatus('on_hold','הועבר להמתנה')">העבר להמתנה</button>
                             <button id="btn-cancel" class="btn btn-danger btn-sm" style="display:none"
                                     onclick="app.changeStatus('cancelled','בוטל')">בטל</button>
                             <button id="btn-clear-extraction" class="btn btn-sm" style="border:1.5px solid #1F3A5F;color:#1F3A5F"
-                                    onclick="app.clearExtraction()">🧹 מחק פענוח</button>
+                                    onclick="app.clearExtraction()">מחק פענוח</button>
                         </div>
                         <button id="expand-icon" title="מסך מלא" onclick="app.toggleBrowserFullscreen()"
                                 style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1">⛶</button>
