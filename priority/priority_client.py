@@ -73,6 +73,11 @@ class PriorityClient:
         """מצרף קובץ ל-EXTFILES של רשומה דרך OData (POST ל-subform).
         parent_entity: שם הישות, למשל 'PINVOICES'
         parent_key: המפתח המורכב, למשל "IVNUM='12345',IVTYPE='P',DEBIT='D'"
+
+        סכמת EXTFILES_SUBFORM (נבדק על PINVOICES של ebyael):
+          EXTFILEDES   — שם/תיאור הקובץ (string)
+          EXTFILENAME  — data URL מלא: "data:<mime>;base64,<base64>"
+          SUFFIX       — סיומת הקובץ באותיות קטנות (pdf/jpeg/...)
         """
         import base64
         from pathlib import Path
@@ -81,13 +86,15 @@ class PriorityClient:
             logger.warning("קובץ לא נמצא לצירוף ל-EXTFILES: %s", file_path)
             return False
         content_b64 = base64.b64encode(p.read_bytes()).decode()
-        ext = p.suffix.lstrip('.').upper() or 'PDF'
+        ext = (p.suffix.lstrip('.') or 'pdf').lower()
+        mime = "application/pdf" if ext == "pdf" else f"image/{ext}"
+        data_url = f"data:{mime};base64,{content_b64}"
         endpoint = f"{parent_entity}({parent_key})/EXTFILES_SUBFORM"
         try:
             await self._post(endpoint, {
-                "EXTDOCNO": p.name,
-                "EXTFILETYPE": ext,
-                "EXTFILEDATA": content_b64,
+                "EXTFILEDES":  p.name,
+                "EXTFILENAME": data_url,
+                "SUFFIX":      ext,
             })
             logger.info("קובץ צורף ל-EXTFILES של %s(%s)", parent_entity, parent_key)
             return True
