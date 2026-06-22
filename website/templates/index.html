@@ -6,7 +6,7 @@
     <title>קליטת חשבוניות ספק</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/main.css?v=tact18">
+    <link rel="stylesheet" href="/static/css/main.css?v=tact19">
     <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
 </head>
 <body>
@@ -127,13 +127,14 @@
                             <button id="btn-clear-extraction" class="btn btn-sm" style="border:1.5px solid #1F3A5F;color:#1F3A5F"
                                     onclick="app.clearExtraction()">מחק פענוח</button>
                         </div>
-                        <button class="btn btn-sm" style="border:1.5px solid #1F3A5F;color:#1F3A5F" onclick="app.reextractInvoice()" id="btn-reextract">
-                            פענוח חוזר
-                        </button>
                         <button id="expand-icon" title="מסך מלא" onclick="app.toggleBrowserFullscreen()"
                                 style="background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0 4px;line-height:1">⛶</button>
                         <button class="modal-close" onclick="app.closeModal()">&times;</button>
                     </div>
+                    <!-- "פענוח חוזר" — ממוקם absolute מעל פינת שמאל-עליונה של ה-iframe (איפה שכפתור ה-PDF.js יושב) -->
+                    <button class="btn btn-sm" style="position:absolute;left:90px;top:50%;transform:translateY(-50%);border:1.5px solid #1F3A5F;color:#1F3A5F;background:#FFFEFB" onclick="app.reextractInvoice()" id="btn-reextract">
+                        פענוח חוזר
+                    </button>
                 </div>
                 <div class="modal-body">
                     <!-- עמודה 1: תצוגת קובץ -->
