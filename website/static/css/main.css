@@ -396,33 +396,30 @@ body {
 }
 .modal-toolbar .btn:hover,
 .modal-toolbar .btn-sm:hover {
-    background: #F1EFE8;
+    background: rgba(31, 58, 95, 0.12);
     color: #1F3A5F;
+    font-weight: 600;
     transform: translateY(-1px);
 }
-/* פעולה ראשית — מילוי steel */
+/* כל הכפתורים אחידים — אפס הבדל בין primary/success/danger.
+   רק במצב פעיל (לחיצה/מיקוד) מתמלאים ב-steel. בלי אדום בכלל. */
+.modal-toolbar .btn,
 .modal-toolbar .btn-primary,
-.modal-toolbar .btn-success {
+.modal-toolbar .btn-success,
+.modal-toolbar .btn-danger {
+    background: #FFFEFB;
+    color: #706A60;
+    border-color: #E7E2D6;
+    font-weight: 500;
+}
+.modal-toolbar .btn:active,
+.modal-toolbar .btn-sm:active,
+.modal-toolbar .btn.is-active {
     background: #1F3A5F;
     color: #F4F1EA;
     border-color: #1F3A5F;
     font-weight: 600;
-}
-.modal-toolbar .btn-primary:hover,
-.modal-toolbar .btn-success:hover {
-    background: #2A4870;
-    color: #F4F1EA;
-}
-/* פעולה הרסנית — מילוי rust */
-.modal-toolbar .btn-danger {
-    background: #D64A2E;
-    color: #FFFEFB;
-    border-color: #D64A2E;
-    font-weight: 600;
-}
-.modal-toolbar .btn-danger:hover {
-    background: #BF3F25;
-    color: #FFFEFB;
+    transform: none;
 }
 /* כפתור X לסגירה — בלי גלולה */
 .modal-toolbar .modal-close,
