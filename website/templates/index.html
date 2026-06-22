@@ -6,7 +6,7 @@
     <title>קליטת חשבוניות ספק</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="apple-touch-icon" href="/static/favicon.svg">
-    <link rel="stylesheet" href="/static/css/main.css?v=tact20">
+    <link rel="stylesheet" href="/static/css/main.css?v=tact21">
     <link rel="stylesheet" href="/static/css/tact-header.css?v=3">
 </head>
 <body>
@@ -104,7 +104,6 @@
                             <span class="tact-logo-word">bookkeeping</span>
                         </span>
                     </span>
-                    <h3 style="font-size:0.95rem;font-weight:600;margin:0">פרטי חשבונית</h3>
                     <div style="display:flex;align-items:center;gap:10px">
                         <!-- כפתורי פעולת קובץ — תמיד גלויים -->
                         <button class="btn btn-sm" style="background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)" onclick="app.testOcrCrop(app.activeHighlight)" id="btn-ocr-test">
@@ -135,8 +134,8 @@
                 <div class="modal-body">
                     <!-- עמודה 1: תצוגת קובץ -->
                     <div class="preview-pane" id="preview-pane">
-                        <!-- "פענוח חוזר" — צף בפינה השמאלית-עליונה של תצוגת הקובץ, בדיוק מעל כפתור ה-3 קווים של PDF.js -->
-                        <button class="btn btn-sm" style="position:absolute;top:8px;left:8px;z-index:20;border:1.5px solid #1F3A5F;color:#1F3A5F;background:#FFFEFB;border-radius:999px;padding:6px 14px;font-size:0.82rem;font-weight:500;box-shadow:0 2px 8px rgba(31,58,95,0.12)" onclick="app.reextractInvoice()" id="btn-reextract">
+                        <!-- "פענוח חוזר" — צף בפינה השמאלית-עליונה של תצוגת הקובץ, בגובה הסרגל העליון (מעל ה-3 קווים של PDF.js) -->
+                        <button class="btn btn-sm" style="position:absolute;top:-42px;left:8px;z-index:201;border:1.5px solid #1F3A5F;color:#1F3A5F;background:#FFFEFB;border-radius:999px;padding:6px 14px;font-size:0.82rem;font-weight:500;box-shadow:0 2px 8px rgba(31,58,95,0.12)" onclick="app.reextractInvoice()" id="btn-reextract">
                             פענוח חוזר
                         </button>
                         <div class="preview-container" id="preview-container">
