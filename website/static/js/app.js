@@ -291,7 +291,7 @@ const app = {
             ${priorityIvnum}
 
             <div class="data-section-card card-invoice">
-                <h4 class="section-header" style="color:var(--text-secondary)">📄 פרטי חשבונית</h4>
+                <h4 class="section-header" style="color:#16a34a">📄 פרטי חשבונית</h4>
                 <div class="data-row">
                     <div class="data-field"><span class="label">חשבונית</span>${ef('invoice_number', d.invoice_number)}</div>
                     <div class="data-field"><span class="label">תאריך</span>${ef('invoice_date', d.invoice_date)}</div>
