@@ -86,13 +86,16 @@ def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
             # יהיה נטו אמיתי. סך כל ה-PRICEs יהיה subtotal; Priority יחשב VAT
             # מלא ויקבל סה"כ נכון.
             price = max(0.0, round(price - first_debit_offset, 2))
-        items.append({
+        item = {
             "PARTNAME": "000",
             "PDES": desc[:100],
             "TQUANT": 1,
             "PRICE": price,
             "ACCNAME": account,
-        })
+        }
+        if vat_type == 'exempt':
+            item["VATFLAGA"] = "N"
+        items.append(item)
 
     return supplier_code, items
 

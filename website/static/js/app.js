@@ -483,7 +483,9 @@ const app = {
         const total    = parseFloat(d.total_amount) || 0;
         const invLines = Array.isArray(d.lines) ? d.lines.filter(l => l && (l.description || l.total_price)) : [];
         const vatType  = d.vat_type || 'full';
-        const vatDed   = vatType === 'two_thirds' ? Math.round(vat * 2 / 3 * 100) / 100 : vat;
+        const vatDed   = vatType === 'two_thirds' ? Math.round(vat * 2 / 3 * 100) / 100
+                       : vatType === 'exempt' ? 0
+                       : vat;
         const vatNd    = vatType === 'two_thirds' ? Math.round((vat - vatDed) * 100) / 100 : 0;
         const lines = [];
         if (invLines.length > 1) {
@@ -495,9 +497,10 @@ const app = {
             // ב-2/3 — ה-1/3 שאינו מנוכה לא נכנס לשורה נפרדת; הוא ייספג בשורה הראשונה ע"י _rebalanceFirstDebit
         } else {
             // total - vatDed מבטיח שהסכום הכולל יהיה בדיוק total_amount (ללא תלות בעיגולי subtotal)
-            const expDebit = vatDed > 0 ? Math.round((total - vatDed) * 100) / 100 : subtotal;
-            // התיאור של השורה הראשונה הוא מה שייכנס לשדה DETAILS בפריורטי —
-            // לוקחים את תיאור שורת החשבונית, ואם אין → שם הספק, ורק כברירת מחדל אחרונה "הוצאות"
+            // exempt: כל הסכום הוצאה (גם אם המסמך מציג מע"מ בטעות)
+            const expDebit = vatType === 'exempt' ? total
+                           : vatDed > 0 ? Math.round((total - vatDed) * 100) / 100
+                           : subtotal;
             const expDesc = (invLines[0] && invLines[0].description)
                 || (d.supplier && d.supplier.name) || 'הוצאות';
             lines.push({ id: 'exp_0', type: 'debit', account: expAcc, description: expDesc, debit: expDebit, credit: 0 });
@@ -603,7 +606,9 @@ const app = {
         else warnHtml = `<span class="jl-warn" style="color:var(--success);font-size:0.82rem">✓ מאוזן</span>`;
 
         const vatType  = d.vat_type || 'full';
-        const vatLabel = vatType === 'two_thirds' ? '2/3 — רכב' : 'חסמ — מע"מ מלא';
+        const vatLabel = vatType === 'two_thirds' ? '2/3 — רכב'
+                       : vatType === 'exempt' ? 'פטור ממע"מ'
+                       : 'חסמ — מע"מ מלא';
         box.innerHTML = `
         <div class="tx-card">
             <div class="tx-card-header" style="gap:8px;flex-wrap:wrap">
@@ -613,6 +618,7 @@ const app = {
                   style="font-size:0.82rem;padding:2px 6px;border:1px solid var(--border);border-radius:4px;cursor:pointer">
                     <option value="full" ${vatType === 'full' ? 'selected' : ''}>חסמ — מע"מ מלא</option>
                     <option value="two_thirds" ${vatType === 'two_thirds' ? 'selected' : ''}>2/3 — רכב</option>
+                    <option value="exempt" ${vatType === 'exempt' ? 'selected' : ''}>פטור ממע"מ</option>
                 </select>
                 <span style="flex:1"></span>
                 ${warnHtml}
