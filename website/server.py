@@ -1405,9 +1405,10 @@ async def create_supplier_in_priority(data: dict = Body(...), user=Depends(requi
 
     try:
         result = await priority_client.create_supplier(payload)
+        assigned_sup_name = (result or {}).get("SUPNAME", "")
         if result:
             companies_db.upsert_company(
-                priority_code=result.get("SUPNAME", ""),
+                priority_code=assigned_sup_name,
                 name=result.get("SUPDES", sup_des),
                 company_type="supplier",
                 tax_id=data.get("VATNUM", ""),
@@ -1415,7 +1416,20 @@ async def create_supplier_in_priority(data: dict = Body(...), user=Depends(requi
                 address=data.get("ADDRESS", ""),
                 phone=data.get("PHONE", ""),
             )
-        return {"ok": True, "supplier": result}
+
+        # פתיחת חשבון ספק בתת-חברה (ACCOUNTS_PAYABLE) אם סופק סניף
+        branch = (data.get("BRANCHNAME") or "").strip()
+        ap_result = None
+        ap_error = None
+        if assigned_sup_name and branch:
+            try:
+                ap_result = await priority_client.create_accounts_payable(assigned_sup_name, branch)
+                logger.info("חשבון ספק נפתח בסניף %s: %s", branch, ap_result)
+            except Exception as ap_err:
+                ap_error = str(ap_err)
+                logger.warning("שגיאה בפתיחת חשבון ספק בסניף %s: %s", branch, ap_err)
+
+        return {"ok": True, "supplier": result, "accounts_payable": ap_result, "ap_error": ap_error}
     except Exception as e:
         logger.error("שגיאה ביצירת ספק בפריורטי: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

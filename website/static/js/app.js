@@ -1732,7 +1732,9 @@ const app = {
             if (!res.ok) throw new Error(result.detail || 'שגיאה לא ידועה');
 
             const assignedCode = result.supplier?.SUPNAME || '';
-            this.showToast(`הספק "${supdes}" הוקם בהצלחה בפריורטי${assignedCode ? ` (קוד: ${assignedCode})` : ''}`, 'success');
+            const apOk = result.accounts_payable && !result.ap_error;
+            const branchMsg = branch && apOk ? ` + חשבון ספק נפתח בסניף ${branch}` : (branch && result.ap_error ? ` (⚠️ חשבון בסניף נכשל: ${result.ap_error})` : '');
+            this.showToast(`הספק "${supdes}" הוקם בהצלחה בפריורטי${assignedCode ? ` (קוד: ${assignedCode})` : ''}${branchMsg}`, 'success');
             this.closeCreateSupplierModal();
 
             // עדכון קוד הספק בחשבונית הנוכחית לפי הקוד שהוקצה על-ידי פריורטי

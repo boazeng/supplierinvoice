@@ -109,6 +109,11 @@ class PriorityClient:
         logger.info("יוצר ספק חדש בפריורטי: %s", supplier_data.get("SUPDES", ""))
         return await self._post("SUPPLIERS", supplier_data)
 
+    async def create_accounts_payable(self, sup_name: str, branch_name: str) -> Optional[dict]:
+        """פתיחת חשבון ספק בתת-חברה (POST ל-ACCOUNTS_PAYABLE)."""
+        logger.info("פותח חשבון ספק %s בסניף %s", sup_name, branch_name)
+        return await self._post("ACCOUNTS_PAYABLE", {"SUPNAME": sup_name, "BRANCHNAME": branch_name})
+
     async def find_supplier_by_tax_id(self, tax_id: str) -> Optional[dict]:
         """חיפוש ספק לפי ח.פ / ע.מ (VATNUM)."""
         logger.info("מחפש ספק לפי ח.פ: %s", tax_id)
