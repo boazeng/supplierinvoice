@@ -104,6 +104,11 @@ class PriorityClient:
 
     # --- ספקים ---
 
+    async def create_supplier(self, supplier_data: dict) -> Optional[dict]:
+        """יצירת ספק חדש ב-Priority (POST ל-SUPPLIERS)."""
+        logger.info("יוצר ספק חדש בפריורטי: %s", supplier_data.get("SUPDES", ""))
+        return await self._post("SUPPLIERS", supplier_data)
+
     async def find_supplier_by_tax_id(self, tax_id: str) -> Optional[dict]:
         """חיפוש ספק לפי ח.פ / ע.מ (VATNUM)."""
         logger.info("מחפש ספק לפי ח.פ: %s", tax_id)

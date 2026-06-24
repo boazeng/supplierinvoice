@@ -190,6 +190,47 @@
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
+    <!-- Create Supplier in Priority Modal -->
+    <div id="create-supplier-modal" class="modal" style="display:none;">
+        <div class="modal-overlay" onclick="app.closeCreateSupplierModal()"></div>
+        <div class="modal-content" style="max-width:460px;height:auto;max-height:90vh;overflow-y:auto">
+            <div class="modal-toolbar">
+                <h3 style="margin:0;font-size:1rem;font-weight:600">הקמת ספק בפריורטי</h3>
+                <button class="modal-close" onclick="app.closeCreateSupplierModal()">&times;</button>
+            </div>
+            <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+                <div class="data-field">
+                    <span class="label">קוד ספק (SUPNAME) *</span>
+                    <input id="cs-supname" class="edit-field" placeholder="קוד קצר ייחודי (עד 8 תווים)" maxlength="8" />
+                </div>
+                <div class="data-field">
+                    <span class="label">שם ספק *</span>
+                    <input id="cs-supdes" class="edit-field" placeholder="שם הספק המלא" />
+                </div>
+                <div class="data-field">
+                    <span class="label">מספר עוסק מורשה / ח.פ</span>
+                    <input id="cs-vatnum" class="edit-field" placeholder="מספר עוסק מורשה" />
+                </div>
+                <div class="data-field">
+                    <span class="label">כתובת</span>
+                    <input id="cs-address" class="edit-field" placeholder="כתובת הספק" />
+                </div>
+                <div class="data-field">
+                    <span class="label">טלפון</span>
+                    <input id="cs-phone" class="edit-field" placeholder="מספר טלפון" />
+                </div>
+                <div class="data-field">
+                    <span class="label">סניף</span>
+                    <span class="ac-field">
+                        <input id="cs-branch" class="edit-field ac-input" data-ep="/api/db/branches/search" placeholder="סניף" autocomplete="off" spellcheck="false" />
+                        <ul class="ac-dd"></ul>
+                    </span>
+                </div>
+                <button id="cs-submit-btn" class="btn btn-success" style="margin-top:4px" onclick="app.createSupplierInPriority()">הקם ספק בפריורטי</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/app.js?v=tx48"></script>
     <script src="/static/js/tact-header.js"></script>
 </body>

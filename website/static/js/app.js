@@ -251,6 +251,9 @@ const app = {
 
         const supMatch = d.supplier?.priority_match_found ? '<span class="match-ok">✓</span>' : '<span class="match-fail">✗</span>';
         const custMatch = d.customer?.priority_match_found ? '<span class="match-ok">✓</span>' : '';
+        const newSupBtn = !d.supplier?.priority_match_found
+            ? `<button class="btn btn-sm" style="margin-top:8px;background:#1F3A5F;color:#fff;width:100%;font-size:0.82rem" onclick="app.openCreateSupplierModal()">הקמת ספק בפריורטי</button>`
+            : '';
         const supTax = d.supplier?.tax_id_type || 'ח.פ/ע.מ';
         const custTax = d.customer?.tax_id_type || 'ח.פ/ע.מ';
 
@@ -306,6 +309,7 @@ const app = {
                     <div class="data-field"><span class="label">${supTax}</span>${ef('supplier.tax_id', d.supplier?.tax_id)}</div>
                     <div class="data-field"><span class="label">פריורטי</span>${ef('supplier.priority_supplier_code', d.supplier?.priority_supplier_code)}</div>
                 </div>
+                ${newSupBtn}
             </div>
 
             <div class="data-section-card card-customer">
@@ -1675,6 +1679,86 @@ const app = {
             }
         } catch (err) {
             // שקט
+        }
+    },
+
+    // === הקמת ספק בפריורטי ===
+
+    openCreateSupplierModal() {
+        const d = this.currentInvoice?.extracted_data;
+        const name = d?.supplier?.name || '';
+        document.getElementById('cs-supdes').value = name;
+        document.getElementById('cs-vatnum').value = d?.supplier?.tax_id || '';
+        document.getElementById('cs-address').value = '';
+        document.getElementById('cs-phone').value = '';
+        document.getElementById('cs-branch').value = d?.customer?.branch || '';
+        // הצעת קוד ספק: המילה הראשונה של השם, באותיות גדולות, עד 8 תווים
+        const suggested = name.trim().split(/\s+/)[0].toUpperCase().substring(0, 8);
+        document.getElementById('cs-supname').value = suggested;
+        const modal = document.getElementById('create-supplier-modal');
+        modal.style.display = 'flex';
+        // אתחול שדה ה-autocomplete בסניף
+        this._setupAcFields(modal);
+    },
+
+    closeCreateSupplierModal() {
+        document.getElementById('create-supplier-modal').style.display = 'none';
+    },
+
+    async createSupplierInPriority() {
+        const supname = document.getElementById('cs-supname').value.trim();
+        const supdes = document.getElementById('cs-supdes').value.trim();
+        const vatnum = document.getElementById('cs-vatnum').value.trim();
+        const address = document.getElementById('cs-address').value.trim();
+        const phone = document.getElementById('cs-phone').value.trim();
+        const branch = document.getElementById('cs-branch').value.trim();
+
+        if (!supname || !supdes) {
+            this.showToast('חובה למלא קוד ספק ושם ספק', 'error');
+            return;
+        }
+
+        const payload = { SUPNAME: supname, SUPDES: supdes };
+        if (vatnum) payload.VATNUM = vatnum;
+        if (address) payload.ADDRESS = address;
+        if (phone) payload.PHONE = phone;
+        if (branch) payload.BRANCHNAME = branch;
+
+        const btn = document.getElementById('cs-submit-btn');
+        btn.disabled = true;
+        btn.textContent = 'מקים ספק...';
+
+        try {
+            const res = await fetch('/api/suppliers/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.detail || 'שגיאה לא ידועה');
+
+            this.showToast(`הספק "${supdes}" הוקם בהצלחה בפריורטי`, 'success');
+            this.closeCreateSupplierModal();
+
+            // עדכון קוד הספק בחשבונית הנוכחית
+            if (this.currentInvoice?.id) {
+                await fetch(`/api/invoices/${this.currentInvoice.id}/update-field`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: 'supplier.priority_supplier_code', value: supname }),
+                });
+                const invRes = await fetch(`/api/invoices/${this.currentInvoice.id}`);
+                if (invRes.ok) {
+                    this.currentInvoice = await invRes.json();
+                    this.renderModal(this.currentInvoice);
+                    this.renderTransactionPreview(this.currentInvoice);
+                }
+            }
+        } catch (e) {
+            this.showToast(`שגיאה: ${e.message}`, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'הקם ספק בפריורטי';
         }
     },
 
