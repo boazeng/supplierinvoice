@@ -1393,12 +1393,11 @@ async def search_companies(
 @app.post("/api/suppliers/create")
 async def create_supplier_in_priority(data: dict = Body(...), user=Depends(require_role("user"))):
     """יצירת ספק חדש ב-Priority ושמירתו ב-DB המקומי."""
-    sup_name = (data.get("SUPNAME") or "").strip()
     sup_des = (data.get("SUPDES") or "").strip()
-    if not sup_name or not sup_des:
-        raise HTTPException(status_code=400, detail="חסרים שדות חובה: קוד ספק ושם ספק")
+    if not sup_des:
+        raise HTTPException(status_code=400, detail="חסר שדה חובה: שם ספק")
 
-    payload = {"SUPNAME": sup_name, "SUPDES": sup_des}
+    payload = {"SUPDES": sup_des}
     for field in ("VATNUM", "ADDRESS", "PHONE", "BRANCHNAME"):
         val = (data.get(field) or "").strip()
         if val:
@@ -1408,7 +1407,7 @@ async def create_supplier_in_priority(data: dict = Body(...), user=Depends(requi
         result = await priority_client.create_supplier(payload)
         if result:
             companies_db.upsert_company(
-                priority_code=result.get("SUPNAME", sup_name),
+                priority_code=result.get("SUPNAME", ""),
                 name=result.get("SUPDES", sup_des),
                 company_type="supplier",
                 tax_id=data.get("VATNUM", ""),

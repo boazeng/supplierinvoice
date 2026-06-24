@@ -1686,18 +1686,13 @@ const app = {
 
     openCreateSupplierModal() {
         const d = this.currentInvoice?.extracted_data;
-        const name = d?.supplier?.name || '';
-        document.getElementById('cs-supdes').value = name;
+        document.getElementById('cs-supdes').value = d?.supplier?.name || '';
         document.getElementById('cs-vatnum').value = d?.supplier?.tax_id || '';
         document.getElementById('cs-address').value = '';
         document.getElementById('cs-phone').value = '';
         document.getElementById('cs-branch').value = d?.customer?.branch || '';
-        // הצעת קוד ספק: המילה הראשונה של השם, באותיות גדולות, עד 8 תווים
-        const suggested = name.trim().split(/\s+/)[0].toUpperCase().substring(0, 8);
-        document.getElementById('cs-supname').value = suggested;
         const modal = document.getElementById('create-supplier-modal');
         modal.style.display = 'flex';
-        // אתחול שדה ה-autocomplete בסניף
         this._setupAcFields(modal);
     },
 
@@ -1706,19 +1701,18 @@ const app = {
     },
 
     async createSupplierInPriority() {
-        const supname = document.getElementById('cs-supname').value.trim();
         const supdes = document.getElementById('cs-supdes').value.trim();
         const vatnum = document.getElementById('cs-vatnum').value.trim();
         const address = document.getElementById('cs-address').value.trim();
         const phone = document.getElementById('cs-phone').value.trim();
         const branch = document.getElementById('cs-branch').value.trim();
 
-        if (!supname || !supdes) {
-            this.showToast('חובה למלא קוד ספק ושם ספק', 'error');
+        if (!supdes) {
+            this.showToast('חובה למלא שם ספק', 'error');
             return;
         }
 
-        const payload = { SUPNAME: supname, SUPDES: supdes };
+        const payload = { SUPDES: supdes };
         if (vatnum) payload.VATNUM = vatnum;
         if (address) payload.ADDRESS = address;
         if (phone) payload.PHONE = phone;
@@ -1737,15 +1731,16 @@ const app = {
             const result = await res.json();
             if (!res.ok) throw new Error(result.detail || 'שגיאה לא ידועה');
 
-            this.showToast(`הספק "${supdes}" הוקם בהצלחה בפריורטי`, 'success');
+            const assignedCode = result.supplier?.SUPNAME || '';
+            this.showToast(`הספק "${supdes}" הוקם בהצלחה בפריורטי${assignedCode ? ` (קוד: ${assignedCode})` : ''}`, 'success');
             this.closeCreateSupplierModal();
 
-            // עדכון קוד הספק בחשבונית הנוכחית
-            if (this.currentInvoice?.id) {
+            // עדכון קוד הספק בחשבונית הנוכחית לפי הקוד שהוקצה על-ידי פריורטי
+            if (this.currentInvoice?.id && assignedCode) {
                 await fetch(`/api/invoices/${this.currentInvoice.id}/update-field`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: 'supplier.priority_supplier_code', value: supname }),
+                    body: JSON.stringify({ path: 'supplier.priority_supplier_code', value: assignedCode }),
                 });
                 const invRes = await fetch(`/api/invoices/${this.currentInvoice.id}`);
                 if (invRes.ok) {
