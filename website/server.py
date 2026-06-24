@@ -1426,6 +1426,7 @@ async def create_supplier_in_priority(data: dict = Body(...), user=Depends(requi
 
     try:
         result = await priority_client.create_supplier(payload)
+        logger.info("תשובת פריורטי ליצירת ספק: %s", result)
         assigned_sup_name = (result or {}).get("SUPNAME", "")
         if result:
             companies_db.upsert_company(
@@ -1442,15 +1443,27 @@ async def create_supplier_in_priority(data: dict = Body(...), user=Depends(requi
         branch = (data.get("BRANCHNAME") or "").strip()
         ap_result = None
         ap_error = None
-        if assigned_sup_name and branch:
+        if not assigned_sup_name:
+            ap_error = f"פריורטי לא החזירה קוד ספק — תשובה: {result}"
+            logger.warning("לא ניתן לפתוח חשבון ספק: SUPNAME חסר בתשובת פריורטי. תשובה: %s", result)
+        elif not branch:
+            ap_error = "לא סופק סניף — חשבון ספק לא נפתח"
+            logger.warning("לא ניתן לפתוח חשבון ספק: BRANCHNAME לא נשלח")
+        else:
             try:
                 ap_result = await priority_client.create_accounts_payable(assigned_sup_name, branch)
                 logger.info("חשבון ספק נפתח בסניף %s: %s", branch, ap_result)
             except Exception as ap_err:
                 ap_error = str(ap_err)
-                logger.warning("שגיאה בפתיחת חשבון ספק בסניף %s: %s", branch, ap_err)
+                logger.warning("שגיאה בפתיחת חשבון ספק %s בסניף %s: %s", assigned_sup_name, branch, ap_err)
 
-        return {"ok": True, "supplier": result, "accounts_payable": ap_result, "ap_error": ap_error}
+        return {
+            "ok": True,
+            "supplier": result,
+            "assigned_sup_name": assigned_sup_name,
+            "accounts_payable": ap_result,
+            "ap_error": ap_error,
+        }
     except Exception as e:
         logger.error("שגיאה ביצירת ספק בפריורטי: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

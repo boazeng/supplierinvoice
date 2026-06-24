@@ -1711,6 +1711,10 @@ const app = {
             this.showToast('חובה למלא שם ספק', 'error');
             return;
         }
+        if (!branch) {
+            this.showToast('שדה הסניף ריק — חשבון ספק לא ייפתח בפריורטי. מלאי סניף ונסי שוב.', 'error');
+            return;
+        }
 
         const payload = { SUPDES: supdes };
         if (vatnum) payload.VATNUM = vatnum;
@@ -1735,10 +1739,13 @@ const app = {
             }
             if (!res.ok) throw new Error(result.detail || 'שגיאה לא ידועה');
 
-            const assignedCode = result.supplier?.SUPNAME || '';
-            const apOk = result.accounts_payable && !result.ap_error;
-            const branchMsg = branch && apOk ? ` + חשבון ספק נפתח בסניף ${branch}` : (branch && result.ap_error ? ` (⚠️ חשבון בסניף נכשל: ${result.ap_error})` : '');
-            this.showToast(`הספק "${supdes}" הוקם בהצלחה בפריורטי${assignedCode ? ` (קוד: ${assignedCode})` : ''}${branchMsg}`, 'success');
+            const assignedCode = result.assigned_sup_name || result.supplier?.SUPNAME || '';
+            this.showToast(`הספק "${supdes}" הוקם בהצלחה בפריורטי${assignedCode ? ` (קוד: ${assignedCode})` : ''}`, 'success');
+            if (result.accounts_payable) {
+                this.showToast(`חשבון ספק נפתח בסניף ${branch}`, 'success');
+            } else if (result.ap_error) {
+                this.showToast(`⚠️ חשבון ספק לא נפתח: ${result.ap_error}`, 'error');
+            }
             this.closeCreateSupplierModal();
 
             // עדכון קוד הספק בחשבונית הנוכחית לפי הקוד שהוקצה על-ידי פריורטי
@@ -1848,7 +1855,7 @@ const app = {
                 if (!li) return;
                 input.value = li.dataset.val;
                 dd.style.display = 'none';
-                this.saveFieldEdit(input);
+                if (input.dataset.path) this.saveFieldEdit(input);
             });
         });
     },
