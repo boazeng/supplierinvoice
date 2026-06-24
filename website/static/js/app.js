@@ -1729,6 +1729,10 @@ const app = {
                 body: JSON.stringify(payload),
             });
             const result = await res.json();
+            if (res.status === 409) {
+                this.showToast(`⚠️ ${result.detail}`, 'error');
+                return;
+            }
             if (!res.ok) throw new Error(result.detail || 'שגיאה לא ידועה');
 
             const assignedCode = result.supplier?.SUPNAME || '';

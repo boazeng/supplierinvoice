@@ -1397,6 +1397,27 @@ async def create_supplier_in_priority(data: dict = Body(...), user=Depends(requi
     if not sup_des:
         raise HTTPException(status_code=400, detail="חסר שדה חובה: שם ספק")
 
+    # בדיקת כפילות לפי שם ולפי מספר עוסק מורשה
+    vatnum = (data.get("VATNUM") or "").strip()
+    if vatnum:
+        existing_by_tax = companies_db.find_by_tax_id(vatnum, "supplier")
+        if existing_by_tax:
+            raise HTTPException(
+                status_code=409,
+                detail=f"קיים כבר ספק עם מספר עוסק מורשה {vatnum}: {existing_by_tax['name']} (קוד: {existing_by_tax['priority_code']})",
+            )
+
+    existing_by_name = [
+        s for s in companies_db.find_by_name(sup_des, "supplier")
+        if s.get("name", "").strip().lower() == sup_des.lower()
+    ]
+    if existing_by_name:
+        s = existing_by_name[0]
+        raise HTTPException(
+            status_code=409,
+            detail=f"קיים כבר ספק בשם '{sup_des}' (קוד: {s['priority_code']})",
+        )
+
     payload = {"SUPDES": sup_des}
     for field in ("VATNUM", "ADDRESS", "PHONE", "BRANCHNAME"):
         val = (data.get(field) or "").strip()
