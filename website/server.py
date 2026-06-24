@@ -641,6 +641,12 @@ async def update_invoice_field(invoice_id: str, body: dict = {}):
             except ValueError:
                 value = 0
         setattr(obj, field, value)
+
+        # כשמנקים קוד ספק — מאפסים את דגל ההתאמה כדי שכפתור "הקמת ספק" יופיע
+        if path == "supplier.priority_supplier_code" and not value:
+            if invoice.extracted_data and invoice.extracted_data.supplier:
+                invoice.extracted_data.supplier.priority_match_found = False
+
         invoice.updated_at = datetime.now().isoformat()
         store.save(invoice)
         logger.info("שדה %s עודכן ל: %s", path, value)

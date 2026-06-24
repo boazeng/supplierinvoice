@@ -276,6 +276,22 @@ def upsert_branch(branch_code: str, name: str, tax_id: str = None,
     conn.close()
 
 
+def remove_suppliers_not_in(active_codes: set) -> int:
+    """מוחק ספקים שאינם ברשימת הקודים הפעילים (נמחקו מפריורטי)."""
+    if not active_codes:
+        return 0
+    conn = get_connection()
+    placeholders = ",".join("?" * len(active_codes))
+    cursor = conn.execute(
+        f"DELETE FROM companies WHERE type='supplier' AND priority_code NOT IN ({placeholders})",
+        list(active_codes),
+    )
+    count = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return count
+
+
 def bulk_upsert_branches(records: list[dict]) -> int:
     """עדכון מרובה של סניפים."""
     conn = get_connection()

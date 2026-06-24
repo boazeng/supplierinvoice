@@ -30,10 +30,11 @@ def _determine_tax_id_type(vatnum: Optional[str], compnum: Optional[str]) -> tup
 
 
 async def sync_suppliers(client: PriorityClient) -> int:
-    """מסנכרן את כל הספקים מפריורטי ל-DB."""
+    """מסנכרן את כל הספקים מפריורטי ל-DB, כולל מחיקת ספקים שהוסרו מפריורטי."""
     logger.info("מתחיל סנכרון ספקים...")
     total = 0
     skip = 0
+    all_records = []
 
     while True:
         result = await client._get("SUPPLIERS", params={
@@ -44,10 +45,9 @@ async def sync_suppliers(client: PriorityClient) -> int:
         if not result or not result.get("value"):
             break
 
-        records = []
         for sup in result["value"]:
             tax_id, tax_type = _determine_tax_id_type(sup.get("VATNUM"), sup.get("COMPNUM"))
-            records.append({
+            all_records.append({
                 "priority_code": sup["SUPNAME"],
                 "name": sup.get("SUPDES", ""),
                 "type": "supplier",
@@ -59,13 +59,19 @@ async def sync_suppliers(client: PriorityClient) -> int:
                 "status": "active" if sup.get("STATDES") == "פעיל" else "inactive",
             })
 
-        count = db.bulk_upsert(records)
-        total += count
-        logger.info("סונכרנו %d ספקים (batch %d)", count, skip // BATCH_SIZE + 1)
+        logger.info("סנכרון ספקים: batch %d — %d רשומות", skip // BATCH_SIZE + 1, len(result["value"]))
 
         if len(result["value"]) < BATCH_SIZE:
             break
         skip += BATCH_SIZE
+
+    if all_records:
+        total = db.bulk_upsert(all_records)
+        # מחיקת ספקים שנמחקו מפריורטי
+        active_codes = {r["priority_code"] for r in all_records}
+        deleted = db.remove_suppliers_not_in(active_codes)
+        if deleted:
+            logger.info("הוסרו %d ספקים שנמחקו מפריורטי", deleted)
 
     logger.info("סנכרון ספקים הושלם — סה\"כ %d", total)
     return total
