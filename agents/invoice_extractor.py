@@ -172,14 +172,16 @@ def _parse_response_to_invoice_data(raw: dict) -> InvoiceData:
 
 async def extract_invoice(file_path: str) -> InvoiceData:
     """מנתח חשבונית באמצעות Claude Vision ומחזיר InvoiceData."""
+    import time
+    t0 = time.monotonic()
     logger.info("מתחיל חילוץ נתונים מקובץ: %s", file_path)
 
     file_data, media_type = _read_file_as_base64(file_path)
 
     import os
     dev_mode = os.getenv("ENV", "production") == "development"
-    http_client = httpx.Client(verify=not dev_mode)
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, http_client=http_client)
+    http_client = httpx.AsyncClient(verify=not dev_mode)
+    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY, http_client=http_client)
 
     # בניית הבקשה עם תמונה
     if media_type == "application/pdf":
@@ -201,19 +203,20 @@ async def extract_invoice(file_path: str) -> InvoiceData:
             },
         }
 
-    response = client.messages.create(
-        model=AI_MODEL,
-        max_tokens=4096,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    content_block,
-                    {"type": "text", "text": EXTRACTION_PROMPT},
-                ],
-            }
-        ],
-    )
+    async with http_client:
+        response = await client.messages.create(
+            model=AI_MODEL,
+            max_tokens=4096,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        content_block,
+                        {"type": "text", "text": EXTRACTION_PROMPT},
+                    ],
+                }
+            ],
+        )
 
     # חילוץ ה-JSON מהתשובה
     raw_text = response.content[0].text.strip()
@@ -227,11 +230,12 @@ async def extract_invoice(file_path: str) -> InvoiceData:
     invoice_data = _parse_response_to_invoice_data(raw_data)
 
     logger.info(
-        "חילוץ הושלם — חשבונית: %s, ספק: %s, שורות: %d, ביטחון: %.2f",
+        "חילוץ הושלם — חשבונית: %s, ספק: %s, שורות: %d, ביטחון: %.2f, זמן: %.1fs",
         invoice_data.invoice_number,
         invoice_data.supplier.name,
         len(invoice_data.lines),
         invoice_data.confidence_score,
+        time.monotonic() - t0,
     )
 
     return invoice_data
@@ -299,8 +303,8 @@ async def reextract_invoice(file_path: str, crop_coords: dict) -> InvoiceData:
     file_data, media_type = _read_file_as_base64(file_path)
     import os
     dev_mode = os.getenv("ENV", "production") == "development"
-    http_client = httpx.Client(verify=not dev_mode)
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, http_client=http_client)
+    http_client = httpx.AsyncClient(verify=not dev_mode)
+    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY, http_client=http_client)
 
     content_blocks = []
 
@@ -330,11 +334,12 @@ async def reextract_invoice(file_path: str, crop_coords: dict) -> InvoiceData:
 
     content_blocks.append({"type": "text", "text": REEXTRACT_PROMPT})
 
-    response = client.messages.create(
-        model=AI_MODEL,
-        max_tokens=4096,
-        messages=[{"role": "user", "content": content_blocks}],
-    )
+    async with http_client:
+        response = await client.messages.create(
+            model=AI_MODEL,
+            max_tokens=4096,
+            messages=[{"role": "user", "content": content_blocks}],
+        )
 
     raw_text = response.content[0].text.strip()
     if raw_text.startswith("```"):

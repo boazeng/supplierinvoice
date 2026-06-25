@@ -109,7 +109,7 @@ def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
             "ACCNAME": account,
         }
         if vat_type == 'exempt':
-            item["VATFLAGA"] = "N"
+            item["VATFLAG"] = "N"
         if taxcode:
             item["TAXCODE"] = taxcode
         items.append(item)
