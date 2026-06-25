@@ -172,26 +172,9 @@ class PriorityClient:
     # --- חשבוניות ---
 
     async def submit_invoice(self, invoice_data: dict) -> dict:
-        """קליטת חשבונית ספק ב-Priority.
-
-        שלב 1: POST ל-PINVOICES ללא PINVOICEITEMS_SUBFORM (כותרת בלבד) → T-number.
-        שלב 2: POST לכל שורה בנפרד ל-PINVOICES(T-number)/PINVOICEITEMS_SUBFORM.
-        הפיצול נדרש כי deep-insert ב-Priority OData אינו אמין."""
-        items = invoice_data.pop("PINVOICEITEMS_SUBFORM", [])
-        result = await self._post("PINVOICES", invoice_data)
-
-        ivnum = (result or {}).get("IVNUM", "")
-        debit = invoice_data.get("DEBIT", "D")
-        if ivnum and items:
-            nav = f"PINVOICES(IVNUM='{ivnum}',IVTYPE='P',DEBIT='{debit}')/PINVOICEITEMS_SUBFORM"
-            for item in items:
-                try:
-                    await self._post(nav, item)
-                except Exception as e:
-                    logger.error("שגיאה בהוספת שורת PINVOICEITEMS ל-%s: %s — %s", ivnum, item, e)
-                    raise
-
-        return result
+        """קליטת חשבונית ספק ב-Priority (POST ל-PINVOICES)."""
+        logger.info("שולח חשבונית לפריורטי: %s", invoice_data.get("BOOKNUM", ""))
+        return await self._post("PINVOICES", invoice_data)
 
     def _pinvoice_key(self, ivnum: str, ivtype: str = "P", debit: str = "D") -> str:
         """מחזיר את המפתח המורכב של PINVOICES לפי OData."""
