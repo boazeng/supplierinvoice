@@ -172,28 +172,11 @@ class PriorityClient:
     # --- חשבוניות ---
 
     async def submit_invoice(self, invoice_data: dict) -> dict:
-        """קליטת חשבונית ספק ב-Priority.
-
-        שלב 1: POST ל-PINVOICES (כותרת בלבד) → T-number.
-        שלב 2: POST לכל שורה בנפרד ל-PINVOICES(T-number)/PINVOICEITEMS_SUBFORM.
-        deep-insert (שליחת השורות בתוך ה-POST הראשוני) נמצא שלא יוצר שורות בפועל."""
-        items = invoice_data.pop("PINVOICEITEMS_SUBFORM", [])
-        logger.info("שולח כותרת חשבונית לפריורטי: BOOKNUM=%s, %d שורות", invoice_data.get("BOOKNUM", ""), len(items))
-        result = await self._post("PINVOICES", invoice_data)
-
-        ivnum = (result or {}).get("IVNUM", "")
-        debit = invoice_data.get("DEBIT", "D")
-        if ivnum and items:
-            nav = f"PINVOICES(IVNUM='{ivnum}',IVTYPE='P',DEBIT='{debit}')/PINVOICEITEMS_SUBFORM"
-            for i, item in enumerate(items, 1):
-                try:
-                    await self._post(nav, item)
-                    logger.info("שורת PINVOICEITEMS %d/%d נוצרה — %s", i, len(items), ivnum)
-                except Exception as e:
-                    logger.error("כשל ביצירת שורת PINVOICEITEMS %d/%d — IVNUM: %s | שורה: %s | שגיאה: %s", i, len(items), ivnum, item, e)
-                    raise
-
-        return result
+        """קליטת חשבונית ספק ב-Priority (POST ל-PINVOICES עם PINVOICEITEMS_SUBFORM)."""
+        logger.info("שולח חשבונית לפריורטי: BOOKNUM=%s, שורות=%d",
+                    invoice_data.get("BOOKNUM", ""),
+                    len(invoice_data.get("PINVOICEITEMS_SUBFORM", [])))
+        return await self._post("PINVOICES", invoice_data)
 
     def _pinvoice_key(self, ivnum: str, ivtype: str = "P", debit: str = "D") -> str:
         """מחזיר את המפתח המורכב של PINVOICES לפי OData."""
