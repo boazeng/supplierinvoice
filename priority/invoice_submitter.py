@@ -68,6 +68,7 @@ def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
     למע"מ ו-1/3 להוצאה."""
     jl = getattr(data, 'journal_lines', None) or []
     vat_type = getattr(data, 'vat_type', 'full') or 'full'
+    taxcode = (getattr(data, 'taxcode', '') or '').strip()
 
     # רק שורות חיוב (לא vat — Priority יחשב אוטומטית)
     debit_rows = [l for l in jl if l.get('type') == 'debit']
@@ -109,6 +110,8 @@ def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
         }
         if vat_type == 'exempt':
             item["VATFLAGA"] = "N"
+        if taxcode:
+            item["TAXCODE"] = taxcode
         items.append(item)
 
     return supplier_code, items

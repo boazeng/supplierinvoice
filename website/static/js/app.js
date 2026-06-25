@@ -488,7 +488,8 @@ const app = {
         // בניה ראשונית מנתוני הפענוח
         this._journalInvId = this.currentInvoice && this.currentInvoice.id;
         const expAcc  = (d.expense_account || '').trim();
-        const vatAcc  = branch ? `205-2-${branch}` : '205-2';
+        const taxcode = (d.taxcode || '').trim();
+        const vatAcc  = taxcode === '003' ? '205-3' : (branch ? `205-2-${branch}` : '205-2');
         const supCode = ((d.supplier && d.supplier.priority_supplier_code) || '').trim();
         const supAcc  = supCode && branch ? `${supCode}-${branch}` : supCode;
         const subtotal = parseFloat(d.subtotal) || 0;
@@ -633,6 +634,11 @@ const app = {
                     <option value="two_thirds" ${vatType === 'two_thirds' ? 'selected' : ''}>2/3 — רכב</option>
                     <option value="exempt" ${vatType === 'exempt' ? 'selected' : ''}>פטור ממע"מ</option>
                 </select>
+                <select id="vat-acc-sel" title="חשבון מע&quot;מ"
+                  style="font-size:0.82rem;padding:2px 6px;border:1px solid var(--border);border-radius:4px;cursor:pointer">
+                    <option value="regular" ${(d.taxcode || '') !== '003' ? 'selected' : ''}>מע"מ רגיל (205-2)</option>
+                    <option value="equipment" ${(d.taxcode || '') === '003' ? 'selected' : ''}>מע"מ ציוד (205-3)</option>
+                </select>
                 <span style="flex:1"></span>
                 ${warnHtml}
                 <button id="btn-collapse-jl" class="btn btn-secondary btn-sm"
@@ -703,6 +709,31 @@ const app = {
             this._initJournalLines(d, branch);
             this._renderJournalTable(box, d, branch);
             this.saveJournalLines();
+        });
+
+        // שינוי חשבון מע"מ — רגיל (205-2) / ציוד (205-3, TAXCODE=003)
+        box.querySelector('#vat-acc-sel').addEventListener('change', async (e) => {
+            e.target.blur();
+            const isEquipment = e.target.value === 'equipment';
+            const newTaxcode  = isEquipment ? '003' : '';
+            const defaultVatAcc = branch ? `205-2-${branch}` : '205-2';
+            const newVatAcc   = isEquipment ? '205-3' : defaultVatAcc;
+            // עדכן שורת מע"מ בפקודת יומן
+            const vatRow = (this.currentJournalLines || []).find(l => l.type === 'vat');
+            if (vatRow) vatRow.account = newVatAcc;
+            // עדכן בזיכרון
+            d.taxcode = newTaxcode;
+            if (this.currentInvoice && this.currentInvoice.extracted_data)
+                this.currentInvoice.extracted_data.taxcode = newTaxcode;
+            // שמור בשרת
+            try {
+                await fetch(`/api/invoices/${this.currentInvoice.id}/update-field`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: 'taxcode', value: newTaxcode }),
+                });
+            } catch {}
+            this.saveJournalLines();
+            this._renderJournalTable(box, d, branch);
         });
 
         // איחוד כל שורות החיוב לשורה אחת ("שורה אחת")

@@ -103,6 +103,8 @@ class InvoiceStore:
                 journal_lines=extracted.get("journal_lines", []),
                 vat_type=extracted.get("vat_type", "full"),
                 fncpatname=extracted.get("fncpatname", ""),
+                is_credit=extracted.get("is_credit", False),
+                taxcode=extracted.get("taxcode", ""),
             )
 
         # מיגרציה — מיפוי סטטוסים ישנים למודל הסטטוסים החדש

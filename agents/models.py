@@ -90,6 +90,7 @@ class InvoiceData:
     vat_type: str = "full"  # "full" = מע"מ מלא 18% | "two_thirds" = 2/3 מע"מ (רכב)
     fncpatname: str = ""    # סוג תנועה בפריורטי (FNCPATNAME) — נשלח ב-OData בעת קליטה
     is_credit: bool = False  # חשבונית זיכוי — DEBIT='C' במקום 'D'
+    taxcode: str = ""        # קוד מס — ריק=ברירת מחדל, "003"=ציוד (חשבון מע"מ 205-3)
 
 
 @dataclass
