@@ -70,6 +70,11 @@ def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
     vat_type = getattr(data, 'vat_type', 'full') or 'full'
     taxcode = (getattr(data, 'taxcode', '') or '').strip()
 
+    # גיבוי: אם שורת מע"מ ביומן היא 205-3 → TAXCODE=003, גם אם שדה taxcode לא נשמר
+    vat_rows = [l for l in jl if l.get('type') == 'vat']
+    if not taxcode and vat_rows and (vat_rows[0].get('account') or '').strip() == '205-3':
+        taxcode = '003'
+
     # רק שורות חיוב (לא vat — Priority יחשב אוטומטית)
     debit_rows = [l for l in jl if l.get('type') == 'debit']
     if not debit_rows:
