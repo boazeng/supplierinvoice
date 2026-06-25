@@ -290,15 +290,24 @@ const app = {
                </div>`
             : '';
 
+        const isCredit = d.is_credit || (parseFloat(d.total_amount) || 0) < 0 || (d.invoice_number || '').includes('זיכוי');
+        const creditBadge = isCredit ? `<span style="background:#fee2e2;color:#b91c1c;border-radius:4px;padding:2px 8px;font-size:0.78rem;font-weight:600;margin-right:6px">זיכוי (DEBIT=C)</span>` : '';
+
         let html = `
             ${priorityIvnum}
 
             <div class="data-section-card card-invoice">
-                <h4 class="section-header" style="color:#16a34a">📄 פרטי חשבונית</h4>
+                <h4 class="section-header" style="color:#16a34a">📄 פרטי חשבונית ${creditBadge}</h4>
                 <div class="data-row">
                     <div class="data-field"><span class="label">חשבונית</span>${ef('invoice_number', d.invoice_number)}</div>
                     <div class="data-field"><span class="label">תאריך</span>${ef('invoice_date', d.invoice_date)}</div>
                     <div class="data-field"><span class="label">הקצאה</span>${ef('allocation_number', d.allocation_number)}</div>
+                </div>
+                <div class="data-row" style="margin-top:4px">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer">
+                        <input type="checkbox" id="chk-is-credit" ${d.is_credit ? 'checked' : ''} onchange="app.toggleIsCredit(this.checked)" />
+                        חשבונית זיכוי (DEBIT=C)
+                    </label>
                 </div>
             </div>
 
@@ -1680,6 +1689,19 @@ const app = {
         } catch (err) {
             // שקט
         }
+    },
+
+    async toggleIsCredit(checked) {
+        if (!this.currentInvoice) return;
+        await fetch(`/api/invoices/${this.currentInvoice.id}/update-field`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: 'is_credit', value: checked }),
+        });
+        if (this.currentInvoice.extracted_data) {
+            this.currentInvoice.extracted_data.is_credit = checked;
+        }
+        this.renderModal(this.currentInvoice);
     },
 
     // === הקמת ספק בפריורטי ===

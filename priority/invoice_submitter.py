@@ -11,16 +11,30 @@ from tools.invoice_store import InvoiceStore
 logger = logging.getLogger("פריורטי.קליטה")
 
 
+def _debit_type(data: InvoiceData) -> str:
+    """מחזיר 'C' לחשבונית זיכוי, 'D' לחשבונית רגילה."""
+    if getattr(data, 'is_credit', False):
+        return "C"
+    total = float(getattr(data, 'total_amount', 0) or 0)
+    if total < 0:
+        return "C"
+    inv_num = (getattr(data, 'invoice_number', '') or '').strip()
+    if 'זיכוי' in inv_num:
+        return "C"
+    return "D"
+
+
 async def _attach_invoice_file(
     priority_client,
     ivnum: str,
     file_path: str,
+    debit: str = "D",
 ) -> None:
     """מצרף את קובץ ה-PDF של החשבונית ל-EXTFILES של PINVOICES ב-Priority.
     אם הקובץ (לפי EXTFILEDES = שם הקובץ) כבר מצורף — מדלגים, כדי למנוע כפילויות
     כשמאמצים IVNUM קיים בעקבות דופליקציה."""
     from pathlib import Path
-    pinvoice_key = f"IVNUM='{ivnum}',IVTYPE='P',DEBIT='D'"
+    pinvoice_key = f"IVNUM='{ivnum}',IVTYPE='P',DEBIT='{debit}'"
     file_name = Path(file_path).name
     try:
         existing = await priority_client._get(
@@ -112,7 +126,7 @@ def _build_priority_payload(data: InvoiceData) -> dict:
     supplier_code, items = _extract_journal_fields(data)
 
     payload = {
-        "DEBIT": "D",
+        "DEBIT": _debit_type(data),
         "BOOKNUM": data.invoice_number,
         "IVDATE": data.invoice_date,
         "SUPNAME": supplier_code,
@@ -154,6 +168,8 @@ async def _finalize_in_priority(
     if not ivnum:
         return
 
+    debit = _debit_type(invoice.extracted_data) if invoice.extracted_data else "D"
+
     if _is_temp_ivnum(ivnum):
         # מספר זמני (T) — צריך CLOSEPRINTPIV בין אם חדש ובין אם כפול
         result = await priority_client.finalize_invoice(
@@ -169,7 +185,7 @@ async def _finalize_in_priority(
             invoice.error_message        = ""
             logger.info("CLOSEPRINTPIV הצליח — IVNUM: %s, FNCNUM: %s", final_ivnum, fncnum)
             if invoice.file_path:
-                await _attach_invoice_file(priority_client, final_ivnum, invoice.file_path)
+                await _attach_invoice_file(priority_client, final_ivnum, invoice.file_path, debit)
         else:
             err_detail = result.get("error", "") or result.get("stderr", "")
             # בפריורטי, CLOSEPRINTPIV יוצר רשומה חדשה עם IVNUM סופי — ה-T-number הישן נשאר.
@@ -198,7 +214,7 @@ async def _finalize_in_priority(
                         invoice.error_message = ""
                         logger.info("נמצא IVNUM סופי לפי BOOKNUM: %s, FNCNUM: %s", found_ivnum, found_fncnum)
                         if invoice.file_path:
-                            await _attach_invoice_file(priority_client, found_ivnum, invoice.file_path)
+                            await _attach_invoice_file(priority_client, found_ivnum, invoice.file_path, debit)
                         return
             invoice.status        = InvoiceStatus.PENDING_SUBMISSION
             invoice.error_message = f"CLOSEPRINTPIV נכשל: {err_detail}" if err_detail else "CLOSEPRINTPIV לא הצליח — בדוק יומן שרת"
@@ -218,7 +234,7 @@ async def _finalize_in_priority(
             invoice.priority_journal_id = str(fncnum)
         invoice.status = InvoiceStatus.PENDING_FILING
         if invoice.file_path:
-            await _attach_invoice_file(priority_client, ivnum, invoice.file_path)
+            await _attach_invoice_file(priority_client, ivnum, invoice.file_path, debit)
 
 
 async def finalize_invoice_background(
@@ -267,7 +283,8 @@ async def submit_invoice_odata_only(
         # מצרפים את ה-PDF ל-EXTFILES של PINVOICES כבר בשלב הטיוטה
         # (השדות זמינים על T-number — לא צריך להמתין ל-CLOSEPRINTPIV)
         if invoice.priority_invoice_id and invoice.file_path:
-            await _attach_invoice_file(priority_client, invoice.priority_invoice_id, invoice.file_path)
+            await _attach_invoice_file(priority_client, invoice.priority_invoice_id, invoice.file_path,
+                                       _debit_type(invoice.extracted_data))
     except Exception as e:
         import httpx as _httpx
         import json as _json
@@ -312,7 +329,8 @@ async def submit_invoice_odata_only(
                 )
                 # מצרפים את הקובץ לרשומה הקיימת
                 if invoice.file_path:
-                    await _attach_invoice_file(priority_client, ivnum, invoice.file_path)
+                    await _attach_invoice_file(priority_client, ivnum, invoice.file_path,
+                                               _debit_type(invoice.extracted_data))
             elif rows:
                 # כל הרשומות מבוטלות — Priority עדיין חוסם את המספר הזה.
                 # יש לבטל את הביטול ב-Priority, או להשתמש במספר חשבונית אחר.

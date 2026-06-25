@@ -89,6 +89,7 @@ class InvoiceData:
     journal_lines: list = field(default_factory=list)  # עריכת פקודת יומן ידנית
     vat_type: str = "full"  # "full" = מע"מ מלא 18% | "two_thirds" = 2/3 מע"מ (רכב)
     fncpatname: str = ""    # סוג תנועה בפריורטי (FNCPATNAME) — נשלח ב-OData בעת קליטה
+    is_credit: bool = False  # חשבונית זיכוי — DEBIT='C' במקום 'D'
 
 
 @dataclass
