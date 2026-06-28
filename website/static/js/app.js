@@ -493,10 +493,19 @@ const app = {
         const supCode = ((d.supplier && d.supplier.priority_supplier_code) || '').trim();
         const supAcc  = supCode && branch ? `${supCode}-${branch}` : supCode;
         const subtotal = parseFloat(d.subtotal) || 0;
-        const vat      = parseFloat(d.vat_amount) || 0;
+        let   vat      = parseFloat(d.vat_amount) || 0;
         const total    = parseFloat(d.total_amount) || 0;
         const invLines = Array.isArray(d.lines) ? d.lines.filter(l => l && (l.description || l.total_price)) : [];
         const vatType  = d.vat_type || 'full';
+        // כלל ברזל: תמיד יש מע"מ אלא אם כן פטור
+        if (vat === 0 && vatType !== 'exempt' && total > 0) {
+            if (subtotal > 0 && subtotal < total) {
+                vat = Math.round((total - subtotal) * 100) / 100;
+            } else {
+                const sub = Math.round(total / 1.18 * 100) / 100;
+                vat = Math.round((total - sub) * 100) / 100;
+            }
+        }
         const vatDed   = vatType === 'two_thirds' ? Math.round(vat * 2 / 3 * 100) / 100
                        : vatType === 'exempt' ? 0
                        : vat;

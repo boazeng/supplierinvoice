@@ -96,6 +96,10 @@ EXTRACTION_PROMPT = """אתה מערכת לחילוץ נתונים מחשבונ�
 - אם שדה לא נמצא — החזר ערך ריק מתאים
 - confidence_score: 0.0-1.0 לפי רמת הוודאות שלך
 - הוסף אזהרות ב-extraction_warnings אם יש חוסר בהירות
+- **מע"מ — חובה לחשב תמיד (18%)**: גם אם מע"מ לא מצוין בנפרד בחשבונית, יש לחשבו.
+  אם subtotal ידוע: vat_amount = total_amount - subtotal
+  אם subtotal לא ידוע: subtotal = round(total_amount / 1.18, 2), vat_amount = total_amount - subtotal
+  **לעולם אל תחזיר vat_amount=0** אלא אם total_amount=0 או שמצוין מפורשות "פטור ממע"מ".
 """
 
 
@@ -154,6 +158,18 @@ def _parse_response_to_invoice_data(raw: dict) -> InvoiceData:
             vat_amount=float(line_raw.get("vat_amount", 0)),
         ))
 
+    subtotal     = float(raw.get("subtotal", 0))
+    vat_amount   = float(raw.get("vat_amount", 0))
+    total_amount = float(raw.get("total_amount", 0))
+
+    # אם Claude החזיר vat=0 אבל יש total — חשב מע"מ 18% (כלל ברזל)
+    if total_amount > 0 and vat_amount == 0:
+        if subtotal > 0 and subtotal < total_amount:
+            vat_amount = round(total_amount - subtotal, 2)
+        else:
+            subtotal   = round(total_amount / 1.18, 2)
+            vat_amount = round(total_amount - subtotal, 2)
+
     return InvoiceData(
         invoice_number=raw.get("invoice_number", ""),
         invoice_date=raw.get("invoice_date", ""),
@@ -161,9 +177,9 @@ def _parse_response_to_invoice_data(raw: dict) -> InvoiceData:
         supplier=supplier,
         customer=customer,
         lines=lines,
-        subtotal=float(raw.get("subtotal", 0)),
-        vat_amount=float(raw.get("vat_amount", 0)),
-        total_amount=float(raw.get("total_amount", 0)),
+        subtotal=subtotal,
+        vat_amount=vat_amount,
+        total_amount=total_amount,
         currency=raw.get("currency", "ILS"),
         confidence_score=float(raw.get("confidence_score", 0)),
         extraction_warnings=raw.get("extraction_warnings", []),
@@ -293,6 +309,7 @@ REEXTRACT_PROMPT = """אתה מערכת לחילוץ נתונים מחשבוני
 - החזר JSON בלבד, ללא טקסט נוסף
 - tax_id — ספרות בלבד (הסר מקפים, רווחים ונקודות)
 - tax_id_type — "ח.פ" או "ע.מ" בלבד
+- **מע"מ — חובה לחשב תמיד (18%)**: אם vat_amount=0 ו-total_amount>0, חשב: subtotal=round(total/1.18,2), vat_amount=total-subtotal
 """
 
 
