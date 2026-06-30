@@ -256,6 +256,47 @@ body {
     text-align: left;
 }
 
+.invoice-table .col-notes {
+    max-width: 160px;
+    min-width: 80px;
+}
+
+.invoice-table .col-notes .notes-display {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+    cursor: pointer;
+    color: var(--text-primary);
+    border-radius: 3px;
+    padding: 2px 4px;
+}
+
+.invoice-table .col-notes .notes-display:hover {
+    background: var(--bg-secondary);
+}
+
+.invoice-table .col-notes .notes-placeholder {
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.notes-inline-edit {
+    width: 100%;
+    min-width: 120px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    padding: 3px 5px;
+    border: 1.5px solid var(--primary);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    resize: none;
+    outline: none;
+}
+
 .invoice-table .btn-delete-row {
     opacity: 0;
     cursor: pointer;

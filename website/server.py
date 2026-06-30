@@ -1216,6 +1216,18 @@ _MANUAL_STATUS = {
 }
 
 
+@app.post("/api/invoices/{invoice_id}/notes")
+async def set_invoice_notes(invoice_id: str, body: dict = {}):
+    """עדכון הערות חשבונית בלבד."""
+    invoice = store.get(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+    invoice.user_notes = body.get("notes", "")
+    invoice.updated_at = datetime.now().isoformat()
+    store.save(invoice)
+    return {"id": invoice.id, "notes": invoice.user_notes}
+
+
 @app.post("/api/invoices/{invoice_id}/status")
 async def set_invoice_status(invoice_id: str, body: dict = {}):
     """שינוי סטטוס ידני: אישור לפענוח / העברה להמתנה / ביטול / החזרה לתהליך."""
