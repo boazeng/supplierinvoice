@@ -257,44 +257,35 @@ body {
 }
 
 .invoice-table .col-notes {
-    max-width: 160px;
-    min-width: 80px;
+    min-width: 120px;
+    max-width: 200px;
 }
 
-.invoice-table .col-notes .notes-display {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 150px;
-    cursor: pointer;
+.notes-input {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    font-size: 0.85rem;
+    font-family: inherit;
     color: var(--text-primary);
-    border-radius: 3px;
-    padding: 2px 4px;
+    padding: 3px 5px;
+    border-radius: 4px;
+    outline: none;
+    box-sizing: border-box;
 }
 
-.invoice-table .col-notes .notes-display:hover {
+.notes-input::placeholder {
+    color: var(--text-muted);
+}
+
+.notes-input:hover {
+    border-color: var(--border);
     background: var(--bg-secondary);
 }
 
-.invoice-table .col-notes .notes-placeholder {
-    color: var(--text-muted);
-    font-size: 1rem;
-    line-height: 1;
-}
-
-.notes-inline-edit {
-    width: 100%;
-    min-width: 120px;
-    font-size: 0.85rem;
-    font-family: inherit;
-    padding: 3px 5px;
-    border: 1.5px solid var(--primary);
-    border-radius: 4px;
+.notes-input:focus {
+    border-color: var(--primary);
     background: var(--bg-primary);
-    color: var(--text-primary);
-    resize: none;
-    outline: none;
 }
 
 .invoice-table .btn-delete-row {

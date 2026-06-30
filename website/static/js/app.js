@@ -159,7 +159,7 @@ const app = {
                       onclick="event.stopPropagation(); app.fileById('${inv.id}')">תייק בספרי הנהלת חשבונות</button>`
                 : `<span class="status-badge status-${inv.status}">${statusLabels[inv.status] || inv.status}</span>`;
 
-            const notesText = (inv.user_notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const notesVal = (inv.user_notes || '').replace(/"/g, '&quot;');
             return `
                 <tr onclick="app.openInvoice('${inv.id}')">
                     <td>${supplierName}</td>
@@ -169,8 +169,13 @@ const app = {
                     <td>${date}</td>
                     <td style="text-align:center">${extractBox(inv.extraction_ok)}</td>
                     <td>${statusCell}</td>
-                    <td class="col-notes" onclick="event.stopPropagation()" title="${notesText}">
-                        <span class="notes-display" onclick="app.editNoteInline(this, '${inv.id}')">${notesText || '<span class=\"notes-placeholder\">+</span>'}</span>
+                    <td class="col-notes" onclick="event.stopPropagation()">
+                        <input type="text" class="notes-input" value="${notesVal}" placeholder="הוסף הערה..."
+                               data-invoice-id="${inv.id}"
+                               onblur="app.saveNote(this)"
+                               onkeydown="if(event.key==='Enter'){this.blur()} if(event.key==='Escape'){this.value=this.dataset.orig;this.blur()}"
+                               onfocus="this.dataset.orig=this.value"
+                               onclick="event.stopPropagation()">
                     </td>
                     <td><button class="btn-delete-row" title="מחק חשבונית" onclick="event.stopPropagation(); app.deleteInvoiceById('${inv.id}')">🗑</button></td>
                 </tr>
@@ -178,33 +183,18 @@ const app = {
         }).join('');
     },
 
-    // === הערות inline ===
-    editNoteInline(spanEl, invoiceId) {
-        const cell = spanEl.closest('td');
-        const current = spanEl.textContent.trim() === '+' ? '' : spanEl.textContent.trim();
-        const input = document.createElement('textarea');
-        input.className = 'notes-inline-edit';
-        input.value = current;
-        input.rows = 2;
-        cell.innerHTML = '';
-        cell.appendChild(input);
-        input.focus();
-        const save = async () => {
-            const val = input.value.trim();
-            try {
-                await fetch(`/api/invoices/${invoiceId}/notes`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notes: val }),
-                });
-            } catch (_) {}
-            await this.loadInvoices();
-        };
-        input.addEventListener('blur', save);
-        input.addEventListener('keydown', e => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); input.blur(); }
-            if (e.key === 'Escape') { input.removeEventListener('blur', save); this.loadInvoices(); }
-        });
+    // === שמירת הערות ===
+    async saveNote(inputEl) {
+        const invoiceId = inputEl.dataset.invoiceId;
+        const val = inputEl.value.trim();
+        if (val === (inputEl.dataset.orig || '').trim()) return;
+        try {
+            await fetch(`/api/invoices/${invoiceId}/notes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: val }),
+            });
+        } catch (_) {}
     },
 
     // === סינון ===
