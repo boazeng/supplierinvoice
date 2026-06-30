@@ -177,7 +177,7 @@ const app = {
                                onfocus="this.dataset.orig=this.value"
                                onclick="event.stopPropagation()">
                     </td>
-                    <td><button class="btn-delete-row" title="מחק חשבונית" onclick="event.stopPropagation(); app.deleteInvoiceById('${inv.id}')">🗑</button></td>
+                    <td class="col-delete"><button class="btn-delete-row" title="מחק חשבונית" onclick="event.stopPropagation(); app.deleteInvoiceById('${inv.id}')">🗑</button></td>
                 </tr>
             `;
         }).join('');

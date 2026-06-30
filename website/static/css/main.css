@@ -257,18 +257,24 @@ body {
 }
 
 .invoice-table .col-notes {
-    min-width: 120px;
-    max-width: 200px;
+    min-width: 140px;
+    max-width: 220px;
+}
+
+.invoice-table .col-delete {
+    width: 36px;
+    min-width: 36px;
+    text-align: center;
 }
 
 .notes-input {
     width: 100%;
-    border: 1px solid transparent;
-    background: transparent;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
     font-size: 0.85rem;
     font-family: inherit;
     color: var(--text-primary);
-    padding: 3px 5px;
+    padding: 4px 7px;
     border-radius: 4px;
     outline: none;
     box-sizing: border-box;
@@ -276,11 +282,6 @@ body {
 
 .notes-input::placeholder {
     color: var(--text-muted);
-}
-
-.notes-input:hover {
-    border-color: var(--border);
-    background: var(--bg-secondary);
 }
 
 .notes-input:focus {
