@@ -161,7 +161,7 @@ const app = {
 
             const notesVal = (inv.user_notes || '').replace(/"/g, '&quot;');
             return `
-                <tr onclick="app.openInvoice('${inv.id}')">
+                <tr onclick="if(!event.target.closest('.col-notes,.col-delete')) app.openInvoice('${inv.id}')">
                     <td>${supplierName}</td>
                     <td>${invoiceNum}${priorityId}</td>
                     <td class="col-amount">${fmt(beforeVat)}</td>
@@ -169,15 +169,14 @@ const app = {
                     <td>${date}</td>
                     <td style="text-align:center">${extractBox(inv.extraction_ok)}</td>
                     <td>${statusCell}</td>
-                    <td class="col-notes" onclick="event.stopPropagation()">
+                    <td class="col-notes">
                         <input type="text" class="notes-input" value="${notesVal}" placeholder="הוסף הערה..."
                                data-invoice-id="${inv.id}"
                                onblur="app.saveNote(this)"
                                onkeydown="if(event.key==='Enter'){this.blur()} if(event.key==='Escape'){this.value=this.dataset.orig;this.blur()}"
-                               onfocus="this.dataset.orig=this.value"
-                               onclick="event.stopPropagation()">
+                               onfocus="this.dataset.orig=this.value">
                     </td>
-                    <td class="col-delete"><button class="btn-delete-row" title="מחק חשבונית" onclick="event.stopPropagation(); app.deleteInvoiceById('${inv.id}')">🗑</button></td>
+                    <td class="col-delete"><button class="btn-delete-row" title="מחק חשבונית" onclick="app.deleteInvoiceById('${inv.id}')">🗑</button></td>
                 </tr>
             `;
         }).join('');
