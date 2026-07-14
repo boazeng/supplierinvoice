@@ -412,7 +412,7 @@ const app = {
                 <div style="padding:10px 14px;display:flex;flex-direction:column;gap:8px">
                     <div id="receipt-docs-chips"></div>
                     <span class="ac-field">
-                        <input class="edit-field ac-input rd-input" data-ep="/api/invoices/${inv.id}/receipt-documents/search"
+                        <input class="edit-field rd-input" data-ep="/api/invoices/${inv.id}/receipt-documents/search"
                                placeholder="בחר תעודת קבלה מפריורטי..." autocomplete="off" spellcheck="false" />
                         <ul class="ac-dd"></ul>
                     </span>
