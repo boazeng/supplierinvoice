@@ -279,6 +279,22 @@ class PriorityClient:
             logger.warning("שגיאה ב-finalize_invoice: %s", e)
             return {"error": str(e)}
 
+    # --- תעודות קבלה מספק ---
+
+    async def get_supplier_receipt_documents(self, sup_name: str) -> list[dict]:
+        """מחזיר את תעודות הקבלה של הספק ממסך 'קבלות סחורה מספק' (DOCUMENTS_P)."""
+        logger.info("מביא תעודות קבלה לספק %s מפריורטי", sup_name)
+        result = await self._get(
+            "DOCUMENTS_P",
+            params={
+                "$filter": f"SUPNAME eq '{sup_name}' and TYPE eq 'P'",
+                "$select": "DOC,DOCNO,CURDATE,BOOKNUM,ORDNAME,STATDES,IVALL,TOTPRICE",
+                "$orderby": "CURDATE desc",
+                "$top": "200",
+            },
+        )
+        return result.get("value", []) if result else []
+
     # --- בדיקת חיבור ---
 
     async def health_check(self) -> bool:

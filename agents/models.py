@@ -87,6 +87,7 @@ class InvoiceData:
     confidence_score: float = 0.0       # 0.0 - 1.0
     extraction_warnings: list[str] = field(default_factory=list)
     journal_lines: list = field(default_factory=list)  # עריכת פקודת יומן ידנית
+    receipt_documents: list = field(default_factory=list)  # תעודות קבלה מהספק (DOCUMENTS_P) המשויכות לחשבונית — נשלחות כ-PIVDOC_SUBFORM
     vat_type: str = "full"  # "full" = מע"מ מלא 18% | "two_thirds" = 2/3 מע"מ (רכב)
     fncpatname: str = ""    # סוג תנועה בפריורטי (FNCPATNAME) — נשלח ב-OData בעת קליטה
     is_credit: bool = False  # חשבונית זיכוי — DEBIT='C' במקום 'D'

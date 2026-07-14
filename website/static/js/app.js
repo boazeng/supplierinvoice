@@ -405,6 +405,20 @@ const app = {
             </div>`;
         }
 
+        // תעודות קבלה לחשבונית (PIVDOC) — נבחרות מתוך "קבלות סחורה מספק" (DOCUMENTS_P) בפריורטי
+        html += `
+            <div class="data-section-card card-receipts">
+                <h4 class="section-header" style="color:#7c3aed">📑 תעודות קבלה לחשבונית</h4>
+                <div style="padding:10px 14px;display:flex;flex-direction:column;gap:8px">
+                    <div id="receipt-docs-chips"></div>
+                    <span class="ac-field">
+                        <input class="edit-field ac-input rd-input" data-ep="/api/invoices/${inv.id}/receipt-documents/search"
+                               placeholder="בחר תעודת קבלה מפריורטי..." autocomplete="off" spellcheck="false" />
+                        <ul class="ac-dd"></ul>
+                    </span>
+                </div>
+            </div>
+        `;
 
         dataDiv.innerHTML = html;
 
@@ -415,6 +429,9 @@ const app = {
 
         // אתחול שדות autocomplete
         this._setupAcFields(dataDiv);
+
+        // תעודות קבלה לחשבונית — בחירה מרובה מ-DOCUMENTS_P
+        this._setupReceiptDocsField(dataDiv, inv);
 
         // הסתרת הזהרות
         document.getElementById('validation-warnings').style.display = 'none';
@@ -1941,6 +1958,123 @@ const app = {
                 dd.style.display = 'none';
                 if (input.dataset.path) this.saveFieldEdit(input);
             });
+        });
+    },
+
+    // תעודות קבלה לחשבונית (PIVDOC) — בחירה מרובה מתוך "קבלות סחורה מספק" (DOCUMENTS_P) בפריורטי
+    _setupReceiptDocsField(container, invoice) {
+        const input = container.querySelector('.rd-input');
+        const chipsBox = container.querySelector('#receipt-docs-chips');
+        if (!input || !chipsBox) return;
+        const dd = input.nextElementSibling;
+
+        let selected = (invoice.extracted_data.receipt_documents || []).slice();
+
+        const renderChips = () => {
+            if (!selected.length) {
+                chipsBox.innerHTML = '<span style="color:var(--text-muted);font-size:0.82rem">לא נבחרו תעודות קבלה</span>';
+                return;
+            }
+            chipsBox.innerHTML = selected.map((rd, i) => `
+                <span class="receipt-doc-chip">
+                    ${(rd.docno || '').replace(/</g, '&lt;')}${rd.totprice ? ' — ₪' + Number(rd.totprice).toLocaleString() : ''}
+                    <span class="rd-remove" data-i="${i}">&times;</span>
+                </span>
+            `).join('');
+        };
+
+        const persist = async () => {
+            try {
+                await fetch(`/api/invoices/${invoice.id}/receipt-documents`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ documents: selected }),
+                });
+                invoice.extracted_data.receipt_documents = selected;
+            } catch (e) { this.showToast('שגיאה בשמירת תעודות קבלה', 'error'); }
+        };
+
+        renderChips();
+
+        chipsBox.addEventListener('click', (e) => {
+            const rm = e.target.closest('.rd-remove');
+            if (!rm) return;
+            selected.splice(parseInt(rm.dataset.i, 10), 1);
+            renderChips();
+            persist();
+        });
+
+        const positionDd = () => {
+            const rect = input.getBoundingClientRect();
+            dd.style.position = 'fixed';
+            dd.style.top = (rect.bottom + 2) + 'px';
+            dd.style.left = rect.left + 'px';
+            dd.style.right = 'auto';
+            dd.style.width = Math.max(280, rect.width) + 'px';
+            dd.style.zIndex = '99999';
+        };
+
+        let lastResults = new Map();  // DOC id -> אובייקט התעודה המלא מהתוצאה האחרונה
+
+        const search = async (q) => {
+            try {
+                const res = await fetch(`${input.dataset.ep}?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                const items = data.results || [];
+                lastResults = new Map(items.map(doc => [doc.DOC, doc]));
+                if (!items.length) {
+                    dd.innerHTML = '<li style="cursor:default;color:var(--text-muted)">אין תעודות קבלה לספק זה</li>';
+                    positionDd();
+                    dd.style.display = 'block';
+                    return;
+                }
+                dd.innerHTML = items.map(doc => {
+                    const isChecked = selected.some(rd => rd.doc === doc.DOC);
+                    const date = (doc.CURDATE || '').slice(0, 10);
+                    const price = doc.TOTPRICE ? '₪' + Number(doc.TOTPRICE).toLocaleString() : '';
+                    const invoiced = doc.IVALL === 'Y' ? ' · חויבה' : '';
+                    const label = `${isChecked ? '✓ ' : ''}${doc.DOCNO}  ${date}  ${price}${invoiced}`;
+                    return `<li data-doc="${doc.DOC}" class="${isChecked ? 'rd-checked' : ''}">${label}</li>`;
+                }).join('');
+                positionDd();
+                dd.style.display = 'block';
+            } catch { dd.style.display = 'none'; }
+        };
+
+        let timer = null;
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => search(input.value), 250);
+        });
+        input.addEventListener('focus', () => search(input.value));
+        input.addEventListener('blur', () => {
+            setTimeout(() => { dd.style.display = 'none'; }, 200);
+        });
+
+        dd.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const li = e.target.closest('li[data-doc]');
+            if (!li) return;
+            const docId = parseInt(li.dataset.doc, 10);
+            const idx = selected.findIndex(rd => rd.doc === docId);
+            if (idx >= 0) {
+                selected.splice(idx, 1);
+            } else {
+                const doc = lastResults.get(docId);
+                if (!doc) return;
+                selected.push({
+                    doc: doc.DOC,
+                    docno: doc.DOCNO || '',
+                    booknum: doc.BOOKNUM || '',
+                    curdate: doc.CURDATE || '',
+                    totprice: doc.TOTPRICE || 0,
+                    ordname: doc.ORDNAME || '',
+                    statdes: doc.STATDES || '',
+                });
+            }
+            renderChips();
+            persist();
+            search(input.value);
         });
     },
 

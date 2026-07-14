@@ -141,6 +141,11 @@ def _build_priority_payload(data: InvoiceData) -> dict:
     if data.allocation_number:
         payload["SDINUMIT"] = data.allocation_number
 
+    # תעודות קבלה לחשבונית (PIVDOC_SUBFORM) — תעודות שנבחרו מ-DOCUMENTS_P ("קבלות סחורה מספק")
+    receipt_docs = getattr(data, 'receipt_documents', None) or []
+    if receipt_docs:
+        payload["PIVDOC_SUBFORM"] = [{"DOC": rd["doc"]} for rd in receipt_docs if rd.get("doc")]
+
     # FNCPATTERN — תבנית כספית (2/3 לרכב, חסמ וכו').
     # שם השדה ב-PINVOICES הוא FNCPATTERN (לא FNCPATNAME שנמצא על FNCSUP).
     fncpat = (getattr(data, 'fncpatname', '') or '').strip()

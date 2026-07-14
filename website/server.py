@@ -692,6 +692,44 @@ async def update_journal_lines(invoice_id: str, body: dict = {}):
     return {"ok": True, "count": len(lines)}
 
 
+@app.get("/api/invoices/{invoice_id}/receipt-documents/search")
+async def search_receipt_documents(invoice_id: str, q: str = Query(default="")):
+    """מביא תעודות קבלה של הספק של החשבונית ממסך 'קבלות סחורה מספק' (DOCUMENTS_P) בפריורטי."""
+    invoice = store.get(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+    if not invoice.extracted_data or not invoice.extracted_data.supplier.priority_supplier_code:
+        return {"results": []}
+
+    sup_code = invoice.extracted_data.supplier.priority_supplier_code
+    docs = await priority_client.get_supplier_receipt_documents(sup_code)
+
+    q_lower = q.strip().lower()
+    if q_lower:
+        docs = [d for d in docs if q_lower in (d.get("DOCNO", "") or "").lower()
+                or q_lower in (d.get("BOOKNUM", "") or "").lower()]
+
+    return {"results": docs}
+
+
+@app.post("/api/invoices/{invoice_id}/receipt-documents")
+async def update_receipt_documents(invoice_id: str, body: dict = {}):
+    """שמירת תעודות הקבלה שנבחרו לשיוך לחשבונית (נשלחות ל-PIVDOC_SUBFORM בעת הקליטה)."""
+    invoice = store.get(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+    if not invoice.extracted_data:
+        raise HTTPException(status_code=400, detail="אין נתונים מחולצים")
+
+    documents = body.get("documents", [])
+    invoice.extracted_data.receipt_documents = documents
+    invoice.updated_at = datetime.now().isoformat()
+    store.save(invoice)
+    logger.info("נשמרו %d תעודות קבלה לחשבונית %s", len(documents), invoice_id[:8])
+
+    return {"ok": True, "count": len(documents)}
+
+
 @app.post("/api/invoices/{invoice_id}/file-to-ledger")
 async def file_invoice_to_ledger(invoice_id: str):
     """תיוק חשבונית בספרי הנהלת חשבונות — לפי סניף + שנת חשבונית."""

@@ -781,6 +781,31 @@ body {
 .ac-dd li:hover, .ac-dd li.ac-selected {
     background: var(--bg-hover);
 }
+.ac-dd li.rd-checked {
+    color: #7c3aed;
+    font-weight: 600;
+}
+
+/* Receipt documents (PIVDOC) chips */
+.receipt-doc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f3e8ff;
+    color: #6d28d9;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 0.8rem;
+    margin: 2px 4px 2px 0;
+}
+.receipt-doc-chip .rd-remove {
+    cursor: pointer;
+    font-weight: 700;
+    opacity: 0.7;
+}
+.receipt-doc-chip .rd-remove:hover {
+    opacity: 1;
+}
 
 .edit-line {
     width: 100%;
@@ -972,6 +997,7 @@ body {
 .data-section-card.card-customer { border-right-color: #1e40af; }
 .data-section-card.card-invoice  { border-right-color: #706A60; }
 .data-section-card.card-lines    { border-right-color: var(--success); }
+.data-section-card.card-receipts { border-right-color: #7c3aed; }
 
 .data-section-card .section-header {
     background: var(--bg-secondary);
