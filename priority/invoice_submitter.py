@@ -53,6 +53,39 @@ async def _attach_invoice_file(
         logger.warning("תיוק קובץ ב-EXTFILES נכשל — IVNUM: %s", ivnum)
 
 
+async def _attach_receipt_documents(
+    priority_client,
+    ivnum: str,
+    receipt_docs: list,
+    debit: str = "D",
+) -> None:
+    """מקשר תעודות קבלה (PIVDOC) לחשבונית ב-Priority.
+    Priority מתעלם בשקט מ-PIVDOC_SUBFORM כשהוא מוצג מקונן בתוך ה-POST הראשוני של PINVOICES —
+    צריך POST נפרד ל-PIVDOC_SUBFORM אחרי שהרשומה כבר קיימת (בדיוק כמו EXTFILES)."""
+    if not receipt_docs:
+        return
+    pinvoice_key = f"IVNUM='{ivnum}',IVTYPE='P',DEBIT='{debit}'"
+    already: set = set()
+    try:
+        existing = await priority_client._get(
+            f"PINVOICES({pinvoice_key})",
+            params={"$expand": "PIVDOC_SUBFORM($select=DOC)"},
+        )
+        already = {row.get("DOC") for row in (existing or {}).get("PIVDOC_SUBFORM", [])}
+    except Exception as e:
+        logger.debug("בדיקת PIVDOC קיים נכשלה (ממשיכים לקישור): %s", e)
+
+    for rd in receipt_docs:
+        doc_id = rd.get("doc")
+        if not doc_id or doc_id in already:
+            continue
+        try:
+            await priority_client._post(f"PINVOICES({pinvoice_key})/PIVDOC_SUBFORM", {"DOC": doc_id})
+            logger.info("תעודת קבלה %s (DOC=%s) קושרה לחשבונית %s", rd.get("docno", ""), doc_id, ivnum)
+        except Exception as e:
+            logger.warning("שגיאה בקישור תעודת קבלה DOC=%s לחשבונית %s: %s", doc_id, ivnum, e)
+
+
 def _extract_journal_fields(data: InvoiceData) -> tuple[str, list[dict]]:
     """מחלץ קוד ספק ופריטים מפקודת היומן הנערכת לטובת PINVOICEITEMS_SUBFORM.
 
@@ -141,11 +174,6 @@ def _build_priority_payload(data: InvoiceData) -> dict:
     if data.allocation_number:
         payload["SDINUMIT"] = data.allocation_number
 
-    # תעודות קבלה לחשבונית (PIVDOC_SUBFORM) — תעודות שנבחרו מ-DOCUMENTS_P ("קבלות סחורה מספק")
-    receipt_docs = getattr(data, 'receipt_documents', None) or []
-    if receipt_docs:
-        payload["PIVDOC_SUBFORM"] = [{"DOC": rd["doc"]} for rd in receipt_docs if rd.get("doc")]
-
     # FNCPATTERN — תבנית כספית (2/3 לרכב, חסמ וכו').
     # שם השדה ב-PINVOICES הוא FNCPATTERN (לא FNCPATNAME שנמצא על FNCSUP).
     fncpat = (getattr(data, 'fncpatname', '') or '').strip()
@@ -177,6 +205,7 @@ async def _finalize_in_priority(
         return
 
     debit = _debit_type(invoice.extracted_data) if invoice.extracted_data else "D"
+    receipt_docs = (getattr(invoice.extracted_data, 'receipt_documents', None) or []) if invoice.extracted_data else []
 
     if _is_temp_ivnum(ivnum):
         # מספר זמני (T) — צריך CLOSEPRINTPIV בין אם חדש ובין אם כפול
@@ -194,6 +223,7 @@ async def _finalize_in_priority(
             logger.info("CLOSEPRINTPIV הצליח — IVNUM: %s, FNCNUM: %s", final_ivnum, fncnum)
             if invoice.file_path:
                 await _attach_invoice_file(priority_client, final_ivnum, invoice.file_path, debit)
+            await _attach_receipt_documents(priority_client, final_ivnum, receipt_docs, debit)
         else:
             err_detail = result.get("error", "") or result.get("stderr", "")
             # בפריורטי, CLOSEPRINTPIV יוצר רשומה חדשה עם IVNUM סופי — ה-T-number הישן נשאר.
@@ -223,6 +253,7 @@ async def _finalize_in_priority(
                         logger.info("נמצא IVNUM סופי לפי BOOKNUM: %s, FNCNUM: %s", found_ivnum, found_fncnum)
                         if invoice.file_path:
                             await _attach_invoice_file(priority_client, found_ivnum, invoice.file_path, debit)
+                        await _attach_receipt_documents(priority_client, found_ivnum, receipt_docs, debit)
                         return
             invoice.status        = InvoiceStatus.PENDING_SUBMISSION
             invoice.error_message = f"CLOSEPRINTPIV נכשל: {err_detail}" if err_detail else "CLOSEPRINTPIV לא הצליח — בדוק יומן שרת"
@@ -243,6 +274,7 @@ async def _finalize_in_priority(
         invoice.status = InvoiceStatus.PENDING_FILING
         if invoice.file_path:
             await _attach_invoice_file(priority_client, ivnum, invoice.file_path, debit)
+        await _attach_receipt_documents(priority_client, ivnum, receipt_docs, debit)
 
 
 async def finalize_invoice_background(
@@ -293,6 +325,10 @@ async def submit_invoice_odata_only(
         if invoice.priority_invoice_id and invoice.file_path:
             await _attach_invoice_file(priority_client, invoice.priority_invoice_id, invoice.file_path,
                                        _debit_type(invoice.extracted_data))
+        receipt_docs = getattr(invoice.extracted_data, 'receipt_documents', None) or []
+        if invoice.priority_invoice_id and receipt_docs:
+            await _attach_receipt_documents(priority_client, invoice.priority_invoice_id, receipt_docs,
+                                            _debit_type(invoice.extracted_data))
     except Exception as e:
         import httpx as _httpx
         import json as _json
@@ -339,6 +375,10 @@ async def submit_invoice_odata_only(
                 if invoice.file_path:
                     await _attach_invoice_file(priority_client, ivnum, invoice.file_path,
                                                _debit_type(invoice.extracted_data))
+                receipt_docs = getattr(invoice.extracted_data, 'receipt_documents', None) or []
+                if receipt_docs:
+                    await _attach_receipt_documents(priority_client, ivnum, receipt_docs,
+                                                    _debit_type(invoice.extracted_data))
             elif rows:
                 # כל הרשומות מבוטלות — Priority עדיין חוסם את המספר הזה.
                 # יש לבטל את הביטול ב-Priority, או להשתמש במספר חשבונית אחר.
