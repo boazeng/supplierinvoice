@@ -416,6 +416,7 @@ const app = {
                                placeholder="בחר תעודת קבלה מפריורטי..." autocomplete="off" spellcheck="false" />
                         <ul class="ac-dd"></ul>
                     </span>
+                    <div id="receipt-docs-mismatch" style="display:none;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;font-size:0.8rem"></div>
                 </div>
             </div>
         `;
@@ -1984,17 +1985,19 @@ const app = {
         };
 
         const persist = async () => {
+            invoice.extracted_data.receipt_documents = selected;
+            this._applyReceiptsToJournal(invoice, selected);
             try {
                 await fetch(`/api/invoices/${invoice.id}/receipt-documents`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ documents: selected }),
                 });
-                invoice.extracted_data.receipt_documents = selected;
             } catch (e) { this.showToast('שגיאה בשמירת תעודות קבלה', 'error'); }
         };
 
         renderChips();
+        this._applyReceiptsToJournal(invoice, selected);
 
         chipsBox.addEventListener('click', (e) => {
             const rm = e.target.closest('.rd-remove');
@@ -2088,6 +2091,46 @@ const app = {
             persist();
             search(input.value);
         });
+    },
+
+    // מעדכן את שורת החיוב הראשונה + שורת המע"מ + שורת הספק בפקודת היומן לפי סכום התעודות
+    // שנבחרו (סה"כ לפני מע"מ / מע"מ / סה"כ כולל מע"מ), ומציג אזהרה אם הסכום הכולל של
+    // התעודות לא תואם לסכום החשבונית. שורות חיוב נוספות (מעבר לראשונה) לא נגעות.
+    _applyReceiptsToJournal(invoice, selected) {
+        const d = invoice.extracted_data;
+        const warnBox = document.getElementById('receipt-docs-mismatch');
+
+        if (!selected.length) {
+            if (warnBox) warnBox.style.display = 'none';
+            return;
+        }
+
+        const receiptsSubtotal = selected.reduce((s, rd) => s + (parseFloat(rd.subtotal) || 0), 0);
+        const receiptsTotal    = selected.reduce((s, rd) => s + (parseFloat(rd.totprice) || 0), 0);
+        const receiptsVat      = Math.round((receiptsTotal - receiptsSubtotal) * 100) / 100;
+
+        const invoiceTotal = parseFloat(d.total_amount) || 0;
+        if (warnBox) {
+            const mismatch = Math.abs(receiptsTotal - invoiceTotal) >= 0.5;
+            warnBox.style.display = mismatch ? 'block' : 'none';
+            if (mismatch) {
+                warnBox.textContent = `⚠ סה"כ התעודות שנבחרו (₪${receiptsTotal.toLocaleString()}) אינו תואם את סה"כ החשבונית (₪${invoiceTotal.toLocaleString()})`;
+            }
+        }
+
+        if (this.currentJournalLines && this.currentJournalLines.length) {
+            const firstDebit = this.currentJournalLines.find(l => l.type === 'debit');
+            const vatLine    = this.currentJournalLines.find(l => l.type === 'vat');
+            const credLine   = this.currentJournalLines.find(l => l.type === 'credit');
+            if (firstDebit) firstDebit.debit = Math.round(receiptsSubtotal * 100) / 100;
+            if (vatLine) vatLine.debit = receiptsVat;
+            if (credLine) credLine.credit = Math.round(receiptsTotal * 100) / 100;
+
+            const box = document.getElementById('transaction-preview');
+            const branch = ((d.customer && d.customer.branch) || '').trim();
+            if (box) this._renderJournalTable(box, d, branch);
+            this.saveJournalLines();
+        }
     },
 
     // === Toast Notifications ===
