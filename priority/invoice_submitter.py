@@ -159,17 +159,27 @@ def _build_priority_payload(data: InvoiceData) -> dict:
     if not data.customer.branch:
         raise ValueError("סניף חסר — יש לערוך ולהזין סניף לפני הקליטה")
 
-    supplier_code, items = _extract_journal_fields(data)
+    receipt_docs = getattr(data, 'receipt_documents', None) or []
 
     payload = {
         "DEBIT": _debit_type(data),
         "BOOKNUM": data.invoice_number,
         "IVDATE": data.invoice_date,
-        "SUPNAME": supplier_code,
-        "DETAILS": items[0]["PDES"],
+        "SUPNAME": data.supplier.priority_supplier_code,
         "BRANCHNAME": data.customer.branch,
-        "PINVOICEITEMS_SUBFORM": items,
     }
+
+    if receipt_docs:
+        # יש תעודות קבלה מקושרות (PIVDOC) — פריורטי מייצר בעצמה את שורות החשבונית
+        # (PRSOURCENAME="קבלה למלאי") ברגע שהתעודות מקושרות אחרי יצירת הרשומה
+        # (ב-_attach_receipt_documents). לכן לא שולחים כאן PINVOICEITEMS_SUBFORM
+        # משלנו — אחרת הסכום נכפל (גם השורה הידנית וגם השורות האוטומטיות מהתעודות).
+        payload["DETAILS"] = (data.lines[0].description if data.lines else "") \
+            or data.supplier.name or "תעודות קבלה"
+    else:
+        supplier_code, items = _extract_journal_fields(data)
+        payload["DETAILS"] = items[0]["PDES"]
+        payload["PINVOICEITEMS_SUBFORM"] = items
 
     if data.allocation_number:
         payload["SDINUMIT"] = data.allocation_number
