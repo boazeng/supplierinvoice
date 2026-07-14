@@ -210,6 +210,28 @@ async def debug_recent():
     ]
 
 
+@app.post("/api/debug/reset-submission/{id_prefix}")
+async def debug_reset_submission(id_prefix: str):
+    """מאפס חשבונית שנתקעה בקליטה (T-number שנעלם/פג תוקף בפריורטי) בחזרה ל'ממתין
+    לקליטה' — כדי לאפשר קליטה מחדש. לא נוגע בנתוני הפענוח (כולל תעודות קבלה שנבחרו),
+    ולא פונה לפריורטי — מאפס רק את המצב המקומי אצלנו."""
+    matches = [i for i in store.get_all() if i.id.startswith(id_prefix)]
+    if not matches:
+        raise HTTPException(status_code=404, detail="חשבונית לא נמצאה")
+    if len(matches) > 1:
+        raise HTTPException(status_code=400, detail="הקידומת תואמת יותר מחשבונית אחת")
+    invoice = matches[0]
+    old_ivnum = invoice.priority_invoice_id
+    invoice.priority_invoice_id = ""
+    invoice.priority_journal_id = ""
+    invoice.error_message = ""
+    invoice.status = InvoiceStatus.PENDING_SUBMISSION
+    invoice.updated_at = datetime.now().isoformat()
+    store.save(invoice)
+    logger.info("איפוס קליטה עבור חשבונית %s (T-number קודם: %s) — חוזרת לממתין לקליטה", invoice.id[:8], old_ivnum)
+    return {"id": invoice.id, "status": invoice.status.value, "old_priority_invoice_id": old_ivnum}
+
+
 @app.get("/api/health")
 async def health_check():
     """בדיקת תקינות השרת."""
