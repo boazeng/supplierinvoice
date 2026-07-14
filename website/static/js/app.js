@@ -2031,10 +2031,17 @@ const app = {
                 dd.innerHTML = items.map(doc => {
                     const isChecked = selected.some(rd => rd.doc === doc.DOC);
                     const date = (doc.CURDATE || '').slice(0, 10);
-                    const price = doc.TOTPRICE ? '₪' + Number(doc.TOTPRICE).toLocaleString() : '';
+                    const qty = Number(doc.TOTQUANT) || 0;
+                    const subtotal = Number(doc.DISPRICE) || 0;
+                    const unitPrice = qty ? (subtotal / qty) : 0;
+                    const total = Number(doc.TOTPRICE) || 0;
                     const invoiced = doc.IVALL === 'Y' ? ' · חויבה' : '';
-                    const label = `${isChecked ? '✓ ' : ''}${doc.DOCNO}  ${date}  ${price}${invoiced}`;
-                    return `<li data-doc="${doc.DOC}" class="${isChecked ? 'rd-checked' : ''}">${label}</li>`;
+                    const title = `${isChecked ? '✓ ' : ''}${doc.DOCNO}  ·  ${date}${invoiced}`;
+                    const details = `כמות: ${qty.toLocaleString()}  ·  מחיר ליחידה: ₪${unitPrice.toLocaleString(undefined, {maximumFractionDigits: 2})}  ·  סה"כ: ₪${subtotal.toLocaleString()}  ·  כולל מע"מ: ₪${total.toLocaleString()}`;
+                    return `<li data-doc="${doc.DOC}" class="${isChecked ? 'rd-checked' : ''}" style="white-space:normal;line-height:1.5">
+                        <div>${title}</div>
+                        <div style="font-size:0.75rem;color:var(--text-muted)">${details}</div>
+                    </li>`;
                 }).join('');
                 positionDd();
                 dd.style.display = 'block';
@@ -2067,6 +2074,8 @@ const app = {
                     docno: doc.DOCNO || '',
                     booknum: doc.BOOKNUM || '',
                     curdate: doc.CURDATE || '',
+                    quantity: doc.TOTQUANT || 0,
+                    subtotal: doc.DISPRICE || 0,
                     totprice: doc.TOTPRICE || 0,
                     ordname: doc.ORDNAME || '',
                     statdes: doc.STATDES || '',

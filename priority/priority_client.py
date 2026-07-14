@@ -288,7 +288,7 @@ class PriorityClient:
             "DOCUMENTS_P",
             params={
                 "$filter": f"SUPNAME eq '{sup_name}' and TYPE eq 'P'",
-                "$select": "DOC,DOCNO,CURDATE,BOOKNUM,ORDNAME,STATDES,IVALL,TOTPRICE",
+                "$select": "DOC,DOCNO,CURDATE,BOOKNUM,ORDNAME,STATDES,IVALL,TOTQUANT,DISPRICE,TOTPRICE",
                 "$orderby": "CURDATE desc",
                 "$top": "200",
             },
