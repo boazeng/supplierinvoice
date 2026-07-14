@@ -101,6 +101,7 @@ class InvoiceStore:
                 confidence_score=extracted.get("confidence_score", 0),
                 extraction_warnings=extracted.get("extraction_warnings", []),
                 journal_lines=extracted.get("journal_lines", []),
+                receipt_documents=extracted.get("receipt_documents", []),
                 vat_type=extracted.get("vat_type", "full"),
                 fncpatname=extracted.get("fncpatname", ""),
                 is_credit=extracted.get("is_credit", False),
