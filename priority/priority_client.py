@@ -287,7 +287,7 @@ class PriorityClient:
         result = await self._get(
             "DOCUMENTS_P",
             params={
-                "$filter": f"SUPNAME eq '{sup_name}' and TYPE eq 'P'",
+                "$filter": f"SUPNAME eq '{sup_name}' and TYPE eq 'P' and STATDES eq 'סופית'",
                 "$select": "DOC,DOCNO,CURDATE,BOOKNUM,ORDNAME,STATDES,IVALL,TOTQUANT,DISPRICE,TOTPRICE",
                 "$orderby": "CURDATE desc",
                 "$top": "200",
