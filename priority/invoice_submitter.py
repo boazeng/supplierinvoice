@@ -361,84 +361,79 @@ async def submit_invoice_odata_only(
             invoice.priority_invoice_id = result.get("IVNUM", "")
             invoice.error_message = ""
             logger.info("OData קלט חשבונית — IVNUM: %s", invoice.priority_invoice_id)
-        # מצרפים את ה-PDF ל-EXTFILES של PINVOICES כבר בשלב הטיוטה
-        # (השדות זמינים על T-number — לא צריך להמתין ל-CLOSEPRINTPIV)
-        if invoice.priority_invoice_id and invoice.file_path:
-            await _attach_invoice_file(priority_client, invoice.priority_invoice_id, invoice.file_path,
-                                       _debit_type(invoice.extracted_data))
-        receipt_docs = getattr(invoice.extracted_data, 'receipt_documents', None) or []
-        if invoice.priority_invoice_id and receipt_docs:
-            await _attach_receipt_documents(priority_client, invoice.priority_invoice_id, receipt_docs,
-                                            _debit_type(invoice.extracted_data))
-    except Exception as e:
-        import httpx as _httpx
-        import json as _json
-        detail = str(e)
-        if isinstance(e, _httpx.HTTPStatusError):
-            raw = e.response.text
-            try:
-                parsed = _json.loads(raw)
-                detail = (
-                    parsed.get("FORM", {}).get("InterfaceErrors", {}).get("text")
-                    or parsed.get("error", {}).get("message")
-                    or raw
-                )
-            except Exception:
-                detail = raw
+            # מצרפים את ה-PDF ל-EXTFILES של PINVOICES כבר בשלב הטיוטה
+            # (השדות זמינים על T-number — לא צריך להמתין ל-CLOSEPRINTPIV)
+            if invoice.priority_invoice_id and invoice.file_path:
+                await _attach_invoice_file(priority_client, invoice.priority_invoice_id, invoice.file_path,
+                                           _debit_type(invoice.extracted_data))
+            receipt_docs = getattr(invoice.extracted_data, 'receipt_documents', None) or []
+            if invoice.priority_invoice_id and receipt_docs:
+                await _attach_receipt_documents(priority_client, invoice.priority_invoice_id, receipt_docs,
+                                                _debit_type(invoice.extracted_data))
+        except Exception as e:
+            import httpx as _httpx
+            import json as _json
+            detail = str(e)
+            if isinstance(e, _httpx.HTTPStatusError):
+                raw = e.response.text
+                try:
+                    parsed = _json.loads(raw)
+                    detail = (
+                        parsed.get("FORM", {}).get("InterfaceErrors", {}).get("text")
+                        or parsed.get("error", {}).get("message")
+                        or raw
+                    )
+                except Exception:
+                    detail = raw
 
-        # זיהוי דופליקציה: Priority מחזיר 'קיימת כבר' / 'כבר קיימת' / 'already exists' —
-        # מספיק לחפש 'קיימת' או 'exists' כדי לתפוס את כל הוריאציות.
-        is_duplicate = "קיימת" in detail or "exists" in detail.lower()
-        if is_duplicate:
-            existing = await priority_client._get(
-                "PINVOICES",
-                params={
-                    "$filter": f"BOOKNUM eq '{invoice.extracted_data.invoice_number}' and SUPNAME eq '{invoice.extracted_data.supplier.priority_supplier_code}'",
-                    "$select": "IVNUM,BOOKNUM,SUPNAME,STATDES,STORNOFLAG",
-                    "$top": "10",
-                },
-            )
-            rows = (existing or {}).get("value", []) if existing else []
-            # מסננים החוצה רשומות מבוטלות (STORNOFLAG='Y' או STATDES='מבוטלת')
-            active = [r for r in rows
-                      if r.get("STORNOFLAG") != "Y"
-                      and (r.get("STATDES") or "") not in ("מבוטלת", "מבוטל")]
-            chosen = active[0] if active else None
-            if chosen:
-                ivnum = chosen.get("IVNUM", "")
-                invoice.priority_invoice_id = ivnum
-                invoice.error_message = ""
-                logger.info(
-                    "אומץ IVNUM קיים לאחר דופליקציה — %s (סטטוס: %s, סה\"כ רשומות: %d, מבוטלות: %d)",
-                    ivnum, chosen.get("STATDES"), len(rows), len(rows) - len(active),
+            # זיהוי דופליקציה
+            is_duplicate = "קיימת" in detail or "exists" in detail.lower()
+            if is_duplicate:
+                existing = await priority_client._get(
+                    "PINVOICES",
+                    params={
+                        "$filter": f"BOOKNUM eq '{invoice.extracted_data.invoice_number}' and SUPNAME eq '{invoice.extracted_data.supplier.priority_supplier_code}'",
+                        "$select": "IVNUM,BOOKNUM,SUPNAME,STATDES,STORNOFLAG",
+                        "$top": "10",
+                    },
                 )
-                # מצרפים את הקובץ לרשומה הקיימת
-                if invoice.file_path:
-                    await _attach_invoice_file(priority_client, ivnum, invoice.file_path,
-                                               _debit_type(invoice.extracted_data))
-                receipt_docs = getattr(invoice.extracted_data, 'receipt_documents', None) or []
-                if receipt_docs:
-                    await _attach_receipt_documents(priority_client, ivnum, receipt_docs,
-                                                    _debit_type(invoice.extracted_data))
-            elif rows:
-                # כל הרשומות מבוטלות — Priority עדיין חוסם את המספר הזה.
-                # יש לבטל את הביטול ב-Priority, או להשתמש במספר חשבונית אחר.
-                cancelled_ivnums = ", ".join(r.get("IVNUM", "") for r in rows[:5])
-                invoice.status = InvoiceStatus.PENDING_SUBMISSION
-                invoice.error_message = (
-                    f"מספר החשבונית {invoice.extracted_data.invoice_number} "
-                    f"של ספק {invoice.extracted_data.supplier.priority_supplier_code} "
-                    f"קיים ב-Priority אך כל הרשומות מבוטלות ({cancelled_ivnums}). "
-                    f"יש לבטל את הביטול ב-Priority, או להשתמש במספר חשבונית שונה."
-                )
-                logger.warning("דופליקציה — כל הרשומות מבוטלות: %s", cancelled_ivnums)
+                rows = (existing or {}).get("value", []) if existing else []
+                active = [r for r in rows
+                          if r.get("STORNOFLAG") != "Y"
+                          and (r.get("STATDES") or "") not in ("מבוטלת", "מבוטל")]
+                chosen = active[0] if active else None
+                if chosen:
+                    ivnum = chosen.get("IVNUM", "")
+                    invoice.priority_invoice_id = ivnum
+                    invoice.error_message = ""
+                    logger.info(
+                        "אומץ IVNUM קיים לאחר דופליקציה — %s (סטטוס: %s, סה\"כ רשומות: %d, מבוטלות: %d)",
+                        ivnum, chosen.get("STATDES"), len(rows), len(rows) - len(active),
+                    )
+                    if invoice.file_path:
+                        await _attach_invoice_file(priority_client, ivnum, invoice.file_path,
+                                                   _debit_type(invoice.extracted_data))
+                    receipt_docs = getattr(invoice.extracted_data, 'receipt_documents', None) or []
+                    if receipt_docs:
+                        await _attach_receipt_documents(priority_client, ivnum, receipt_docs,
+                                                        _debit_type(invoice.extracted_data))
+                elif rows:
+                    cancelled_ivnums = ", ".join(r.get("IVNUM", "") for r in rows[:5])
+                    invoice.status = InvoiceStatus.PENDING_SUBMISSION
+                    invoice.error_message = (
+                        f"מספר החשבונית {invoice.extracted_data.invoice_number} "
+                        f"של ספק {invoice.extracted_data.supplier.priority_supplier_code} "
+                        f"קיים ב-Priority אך כל הרשומות מבוטלות ({cancelled_ivnums}). "
+                        f"יש לבטל את הביטול ב-Priority, או להשתמש במספר חשבונית שונה."
+                    )
+                    logger.warning("דופליקציה — כל הרשומות מבוטלות: %s", cancelled_ivnums)
+                else:
+                    invoice.status = InvoiceStatus.PENDING_SUBMISSION
+                    invoice.error_message = f"שגיאה בקליטה: {detail}"
             else:
                 invoice.status = InvoiceStatus.PENDING_SUBMISSION
-                invoice.error_message = f"שגיאה בקליטה: {detail}"
-        else:
-            invoice.status = InvoiceStatus.PENDING_SUBMISSION
-            invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
-            logger.error("שגיאה בקליטה: %s", detail)
+                invoice.error_message = f"שגיאה בקליטה בפריורטי: {detail}"
+                logger.error("שגיאה בקליטה: %s", detail)
 
     finally:
         # שחזור FNCPATNAME לערך המקורי אם שינינו אותו
