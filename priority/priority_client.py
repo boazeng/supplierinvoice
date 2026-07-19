@@ -52,6 +52,25 @@ class PriorityClient:
             logger.error("שגיאת תקשורת עם Priority: %s", e)
             return None
 
+    async def _patch(self, entity: str, data: dict) -> Optional[dict]:
+        """שליחת PATCH request ל-Priority OData (עדכון חלקי של רשומה קיימת)."""
+        client = await self._get_client()
+        url = f"{self.base_url}/{entity}"
+        logger.debug("PATCH %s | data=%s", url, data)
+        try:
+            response = await client.patch(url, json=data, headers={
+                "Content-Type": "application/json",
+                "If-Match": "*",
+            })
+            response.raise_for_status()
+            return response.json() if response.content else {}
+        except httpx.HTTPStatusError as e:
+            logger.error("שגיאת HTTP מ-Priority (PATCH): %s — %s", e.response.status_code, e.response.text)
+            raise
+        except httpx.RequestError as e:
+            logger.error("שגיאת תקשורת עם Priority (PATCH): %s", e)
+            raise
+
     async def _post(self, entity: str, data: dict) -> Optional[dict]:
         """שליחת POST request ל-Priority OData."""
         client = await self._get_client()
