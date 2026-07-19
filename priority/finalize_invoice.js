@@ -249,6 +249,13 @@ async function main() {
   );
   process.stderr.write('Login OK\n');
 
+  // ===== עדכון FNCSUP לפני פתיחת PINVOICES (רק ב-2/3) =====
+  // חשוב: פעולה זו חייבת לקרות לפני פתיחת PINVOICES כדי למנוע קונפליקט ב-WCF
+  let _origFncpatname = '';
+  if (vatType === 'two_thirds' && supplierCode) {
+    _origFncpatname = await getAndSetSupplierFncpatname(company, supplierCode, '2/3');
+  }
+
   process.stderr.write(`Opening PINVOICES for ${ivnum}...\n`);
   const form = await withTimeout(
     new Promise((res, rej) => priority.formStartEx(
@@ -311,12 +318,6 @@ async function main() {
     }
   }
 
-  // ===== עדכון FNCSUP לפני CLOSEPRINTPIV (רק ב-2/3) =====
-  let _origFncpatname = '';
-  if (vatType === 'two_thirds' && supplierCode) {
-    _origFncpatname = await getAndSetSupplierFncpatname(company, supplierCode, '2/3');
-  }
-
   // ===== סגירת החשבונית =====
   // CLOSEPRINTPIV עם activateStart('CLOSEPRINTPIV', 'P') — מחזיר 'client' כשהסגירה הצליחה בשרת
   const procAttempts = [
@@ -327,40 +328,31 @@ async function main() {
   ];
 
   let procSucceeded = false;
-  try {
-    for (const attempt of procAttempts) {
-      const { method, proc, type } = attempt;
-      process.stderr.write(`Trying ${method}('${proc}', '${type}')...\n`);
-      let firstStep;
-      if (method === 'activateStart') {
-        firstStep = await withTimeout(
-          new Promise((res, rej) => form.activateStart(proc, type, null, res, rej)),
-          30000, `activateStart ${proc}`
-        ).catch(e => ({ type: 'error_caught', error: e.message }));
-      } else {
-        firstStep = await withTimeout(
-          new Promise((res, rej) => priority.procStart(proc, type, null, company, res, rej)),
-          30000, `procStart ${proc}`
-        ).catch(e => ({ type: 'error_caught', error: e.message }));
-      }
-      process.stderr.write(`${method} ${proc}: firstStep.type=${firstStep.type}\n`);
-      if (firstStep.type === 'client' || firstStep.type === 'displayUrl') {
-        process.stderr.write(`${method} ${proc}: client step data=${JSON.stringify({url: firstStep.url, message: firstStep.message, displayUrl: firstStep.displayUrl, proc: !!firstStep.proc})}\n`);
-      }
-
-      if (isNotFoundError(firstStep)) continue; // לא קיים — נסה הבא
-
-      const result = await runProcedure(firstStep, `${method}_${proc}`, ivnum);
-      process.stderr.write(`${method} ${proc}: result=${JSON.stringify(result)}\n`);
-      if (result.ok) { procSucceeded = true; break; }
+  for (const attempt of procAttempts) {
+    const { method, proc, type } = attempt;
+    process.stderr.write(`Trying ${method}('${proc}', '${type}')...\n`);
+    let firstStep;
+    if (method === 'activateStart') {
+      firstStep = await withTimeout(
+        new Promise((res, rej) => form.activateStart(proc, type, null, res, rej)),
+        30000, `activateStart ${proc}`
+      ).catch(e => ({ type: 'error_caught', error: e.message }));
+    } else {
+      firstStep = await withTimeout(
+        new Promise((res, rej) => priority.procStart(proc, type, null, company, res, rej)),
+        30000, `procStart ${proc}`
+      ).catch(e => ({ type: 'error_caught', error: e.message }));
     }
-  } finally {
-    // שחזור FNCPATNAME המקורי אחרי CLOSEPRINTPIV
-    if (vatType === 'two_thirds' && supplierCode && _origFncpatname && _origFncpatname !== '2/3') {
-      await getAndSetSupplierFncpatname(company, supplierCode, _origFncpatname).catch(e => {
-        process.stderr.write(`[FNCSUP] Warning: failed to restore FNCPATNAME: ${e.message}\n`);
-      });
+    process.stderr.write(`${method} ${proc}: firstStep.type=${firstStep.type}\n`);
+    if (firstStep.type === 'client' || firstStep.type === 'displayUrl') {
+      process.stderr.write(`${method} ${proc}: client step data=${JSON.stringify({url: firstStep.url, message: firstStep.message, displayUrl: firstStep.displayUrl, proc: !!firstStep.proc})}\n`);
     }
+
+    if (isNotFoundError(firstStep)) continue; // לא קיים — נסה הבא
+
+    const result = await runProcedure(firstStep, `${method}_${proc}`, ivnum);
+    process.stderr.write(`${method} ${proc}: result=${JSON.stringify(result)}\n`);
+    if (result.ok) { procSucceeded = true; break; }
   }
 
   process.stderr.write(`Proc loop done. procSucceeded=${procSucceeded}\n`);
@@ -380,6 +372,13 @@ async function main() {
   process.stderr.write(`After: IVNUM=${ivnumFinal} FNCNUM=${fncnum}\n`);
 
   await withTimeout(new Promise((res, rej) => form.endCurrentForm(false, res, rej)), 15000, 'endForm').catch(() => {});
+
+  // ===== שחזור FNCPATNAME המקורי אחרי סגירת PINVOICES =====
+  if (vatType === 'two_thirds' && supplierCode && _origFncpatname && _origFncpatname !== '2/3') {
+    await getAndSetSupplierFncpatname(company, supplierCode, _origFncpatname).catch(e => {
+      process.stderr.write(`[FNCSUP] Warning: failed to restore FNCPATNAME: ${e.message}\n`);
+    });
+  }
 
   // צירוף קובץ לתנועת יומן (FNCTRANS) — אחרי CLOSEPRINTPIV יש FNCNUM
   if (filePath && fs.existsSync(filePath) && fncnum && !isTempIvnum(ivnumFinal)) {
