@@ -179,9 +179,61 @@ function isClientOnly(step) {
   return step.type === 'client';
 }
 
+/**
+ * פותח את מסך FNCSUP של הספק דרך WCF, קורא את FNCPATNAME הנוכחי,
+ * מעדכן ל-newPatName אם שונה, וסוגר. מחזיר את הערך המקורי.
+ * On error: mutes the error and returns ''.
+ */
+async function getAndSetSupplierFncpatname(company, supplierCode, newPatName) {
+  try {
+    process.stderr.write(`[FNCSUP] Opening for supplier ${supplierCode}, target FNCPATNAME="${newPatName}"\n`);
+    const fncsupForm = await withTimeout(
+      new Promise((res, rej) => priority.formStartEx(
+        'FNCSUP',
+        makeMessageHandler('FNCSUP'),
+        null,
+        company, 1, { zoomValue: supplierCode }, res, rej
+      )),
+      30000, 'formStartEx FNCSUP'
+    );
+    const rows = await withTimeout(
+      new Promise((res, rej) => fncsupForm.getRows(1, res, rej)),
+      15000, 'getRows FNCSUP'
+    );
+    const rowData = (rows && rows.FNCSUP)
+      ? (rows.FNCSUP['1'] || Object.values(rows.FNCSUP)[0] || {})
+      : {};
+    const original = (rowData.FNCPATNAME || '').trim();
+    process.stderr.write(`[FNCSUP] current FNCPATNAME="${original}"\n`);
+
+    if (original !== newPatName) {
+      await withTimeout(
+        new Promise((res, rej) => fncsupForm.editRow(1, res, rej)),
+        10000, 'editRow FNCSUP'
+      );
+      await withTimeout(
+        new Promise((res, rej) => fncsupForm.fieldUpdate('FNCPATNAME', newPatName, res, rej)),
+        10000, 'fieldUpdate FNCPATNAME'
+      );
+      await withTimeout(
+        new Promise((res, rej) => fncsupForm.saveRow(false, res, rej)),
+        15000, 'saveRow FNCSUP'
+      );
+      process.stderr.write(`[FNCSUP] FNCPATNAME updated to "${newPatName}"\n`);
+    } else {
+      process.stderr.write(`[FNCSUP] FNCPATNAME already "${newPatName}", no change needed\n`);
+    }
+    await fncsupForm.endCurrentForm(false).catch(() => {});
+    return original;
+  } catch (e) {
+    process.stderr.write(`[FNCSUP] Warning: failed to set FNCPATNAME: ${e.message}\n`);
+    return '';
+  }
+}
+
 async function main() {
-  const [ivnum, filePath] = process.argv.slice(2);
-  if (!ivnum) throw new Error('Usage: node finalize_invoice.js <IVNUM> [filePath]');
+  const [ivnum, filePath, supplierCode, vatType] = process.argv.slice(2);
+  if (!ivnum) throw new Error('Usage: node finalize_invoice.js <IVNUM> [filePath] [supplierCode] [vatType]');
 
   const odataUrl = process.env.PRIORITY_URL_REAL || '';
   const { serviceUrl, tabulaini, company } = parseOdataUrl(odataUrl);
@@ -259,6 +311,12 @@ async function main() {
     }
   }
 
+  // ===== עדכון FNCSUP לפני CLOSEPRINTPIV (רק ב-2/3) =====
+  let _origFncpatname = '';
+  if (vatType === 'two_thirds' && supplierCode) {
+    _origFncpatname = await getAndSetSupplierFncpatname(company, supplierCode, '2/3');
+  }
+
   // ===== סגירת החשבונית =====
   // CLOSEPRINTPIV עם activateStart('CLOSEPRINTPIV', 'P') — מחזיר 'client' כשהסגירה הצליחה בשרת
   const procAttempts = [
@@ -269,31 +327,40 @@ async function main() {
   ];
 
   let procSucceeded = false;
-  for (const attempt of procAttempts) {
-    const { method, proc, type } = attempt;
-    process.stderr.write(`Trying ${method}('${proc}', '${type}')...\n`);
-    let firstStep;
-    if (method === 'activateStart') {
-      firstStep = await withTimeout(
-        new Promise((res, rej) => form.activateStart(proc, type, null, res, rej)),
-        30000, `activateStart ${proc}`
-      ).catch(e => ({ type: 'error_caught', error: e.message }));
-    } else {
-      firstStep = await withTimeout(
-        new Promise((res, rej) => priority.procStart(proc, type, null, company, res, rej)),
-        30000, `procStart ${proc}`
-      ).catch(e => ({ type: 'error_caught', error: e.message }));
-    }
-    process.stderr.write(`${method} ${proc}: firstStep.type=${firstStep.type}\n`);
-    if (firstStep.type === 'client' || firstStep.type === 'displayUrl') {
-      process.stderr.write(`${method} ${proc}: client step data=${JSON.stringify({url: firstStep.url, message: firstStep.message, displayUrl: firstStep.displayUrl, proc: !!firstStep.proc})}\n`);
-    }
+  try {
+    for (const attempt of procAttempts) {
+      const { method, proc, type } = attempt;
+      process.stderr.write(`Trying ${method}('${proc}', '${type}')...\n`);
+      let firstStep;
+      if (method === 'activateStart') {
+        firstStep = await withTimeout(
+          new Promise((res, rej) => form.activateStart(proc, type, null, res, rej)),
+          30000, `activateStart ${proc}`
+        ).catch(e => ({ type: 'error_caught', error: e.message }));
+      } else {
+        firstStep = await withTimeout(
+          new Promise((res, rej) => priority.procStart(proc, type, null, company, res, rej)),
+          30000, `procStart ${proc}`
+        ).catch(e => ({ type: 'error_caught', error: e.message }));
+      }
+      process.stderr.write(`${method} ${proc}: firstStep.type=${firstStep.type}\n`);
+      if (firstStep.type === 'client' || firstStep.type === 'displayUrl') {
+        process.stderr.write(`${method} ${proc}: client step data=${JSON.stringify({url: firstStep.url, message: firstStep.message, displayUrl: firstStep.displayUrl, proc: !!firstStep.proc})}\n`);
+      }
 
-    if (isNotFoundError(firstStep)) continue; // לא קיים — נסה הבא
+      if (isNotFoundError(firstStep)) continue; // לא קיים — נסה הבא
 
-    const result = await runProcedure(firstStep, `${method}_${proc}`, ivnum);
-    process.stderr.write(`${method} ${proc}: result=${JSON.stringify(result)}\n`);
-    if (result.ok) { procSucceeded = true; break; }
+      const result = await runProcedure(firstStep, `${method}_${proc}`, ivnum);
+      process.stderr.write(`${method} ${proc}: result=${JSON.stringify(result)}\n`);
+      if (result.ok) { procSucceeded = true; break; }
+    }
+  } finally {
+    // שחזור FNCPATNAME המקורי אחרי CLOSEPRINTPIV
+    if (vatType === 'two_thirds' && supplierCode && _origFncpatname && _origFncpatname !== '2/3') {
+      await getAndSetSupplierFncpatname(company, supplierCode, _origFncpatname).catch(e => {
+        process.stderr.write(`[FNCSUP] Warning: failed to restore FNCPATNAME: ${e.message}\n`);
+      });
+    }
   }
 
   process.stderr.write(`Proc loop done. procSucceeded=${procSucceeded}\n`);

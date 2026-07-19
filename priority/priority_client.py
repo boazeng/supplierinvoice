@@ -201,9 +201,12 @@ class PriorityClient:
         """מחזיר את המפתח המורכב של PINVOICES לפי OData."""
         return f"PINVOICES(IVNUM='{ivnum}',IVTYPE='{ivtype}',DEBIT='{debit}')"
 
-    async def finalize_invoice(self, ivnum: str, file_path: str = "") -> dict:
+    async def finalize_invoice(
+        self, ivnum: str, file_path: str = "", vat_type: str = "", supplier_code: str = ""
+    ) -> dict:
         """
         מצרף קובץ ומבצע CLOSEPRINTPIV על חשבונית דרך WCF SDK.
+        אם vat_type='two_thirds' ו-supplier_code סופק, מעדכן FNCSUP.FNCPATNAME ל-'2/3' לפני הסגירה ומשחזר אחרי.
         מחזיר {"ivnum": ..., "fncnum": ...} בהצלחה או {} בכישלון.
         """
         import asyncio
@@ -254,12 +257,13 @@ class PriorityClient:
                 logger.error("npm install נכשל: %s", e)
                 return {}
 
-        args = [node_executable, str(js_script), ivnum]
-        if file_path and Path(file_path).exists():
-            args.append(file_path)
-            logger.info("מצרף קובץ לפריורטי: %s", file_path)
-        elif file_path:
+        actual_file = file_path if (file_path and Path(file_path).exists()) else ""
+        if file_path and not actual_file:
             logger.warning("קובץ לא נמצא בנתיב: %s — יוחלף ללא צירוף", file_path)
+        elif actual_file:
+            logger.info("מצרף קובץ לפריורטי: %s", actual_file)
+        # args positional: ivnum, filePath, supplierCode, vatType
+        args = [node_executable, str(js_script), ivnum, actual_file, supplier_code or "", vat_type or ""]
 
         logger.info("מריץ finalize_invoice.js עבור IVNUM %s", ivnum)
         try:
