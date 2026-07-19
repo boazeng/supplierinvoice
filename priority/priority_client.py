@@ -275,7 +275,7 @@ class PriorityClient:
             )
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=180)
             if stderr:
-                logger.info("finalize_invoice stderr: %s", stderr.decode(errors="replace")[:1000])
+                logger.info("finalize_invoice stderr: %s", stderr.decode(errors="replace")[:5000])
             # dotenv עלול להדפיס שורות לוג ל-stdout לפני ה-JSON — לוקחים את השורה האחרונה שמתחילה ב-{
             raw_full = stdout.decode(errors="replace").strip()
             raw = ""

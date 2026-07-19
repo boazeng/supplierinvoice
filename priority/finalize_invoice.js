@@ -185,17 +185,25 @@ function isClientOnly(step) {
  * On error: mutes the error and returns ''.
  */
 async function getAndSetSupplierFncpatname(company, supplierCode, newPatName) {
+  process.stderr.write(`[FNCSUP] START: supplier=${supplierCode} target="${newPatName}"\n`);
+
+  let fncsupForm;
   try {
-    process.stderr.write(`[FNCSUP] Opening for supplier ${supplierCode}, target FNCPATNAME="${newPatName}"\n`);
-    const fncsupForm = await withTimeout(
+    fncsupForm = await withTimeout(
       new Promise((res, rej) => priority.formStartEx(
-        'FNCSUP',
-        makeMessageHandler('FNCSUP'),
-        null,
+        'FNCSUP', makeMessageHandler('FNCSUP'), null,
         company, 1, { zoomValue: supplierCode }, res, rej
       )),
       30000, 'formStartEx FNCSUP'
     );
+    process.stderr.write(`[FNCSUP] form opened OK\n`);
+  } catch (e) {
+    process.stderr.write(`[FNCSUP] FAILED to open form: ${e.message}\n`);
+    return { original: '', saved: false };
+  }
+
+  let original = '';
+  try {
     const rows = await withTimeout(
       new Promise((res, rej) => fncsupForm.getRows(1, res, rej)),
       15000, 'getRows FNCSUP'
@@ -203,31 +211,52 @@ async function getAndSetSupplierFncpatname(company, supplierCode, newPatName) {
     const rowData = (rows && rows.FNCSUP)
       ? (rows.FNCSUP['1'] || Object.values(rows.FNCSUP)[0] || {})
       : {};
-    const original = (rowData.FNCPATNAME || '').trim();
-    process.stderr.write(`[FNCSUP] current FNCPATNAME="${original}"\n`);
-
-    if (original !== newPatName) {
-      await withTimeout(
-        new Promise((res, rej) => fncsupForm.setActiveRow(1, res, rej)),
-        10000, 'setActiveRow FNCSUP'
-      );
-      await withTimeout(
-        new Promise((res, rej) => fncsupForm.fieldUpdate('FNCPATNAME', newPatName, res, rej)),
-        10000, 'fieldUpdate FNCPATNAME'
-      );
-      await withTimeout(
-        new Promise((res, rej) => fncsupForm.saveRow(false, res, rej)),
-        15000, 'saveRow FNCSUP'
-      );
-      process.stderr.write(`[FNCSUP] FNCPATNAME updated to "${newPatName}"\n`);
-    } else {
-      process.stderr.write(`[FNCSUP] FNCPATNAME already "${newPatName}", no change needed\n`);
-    }
-    await fncsupForm.endCurrentForm(false).catch(() => {});
-    return original;
+    original = (rowData.FNCPATNAME || '').trim();
+    process.stderr.write(`[FNCSUP] read FNCPATNAME="${original}" rowKeys=${Object.keys(rowData).join(',')}\n`);
   } catch (e) {
-    process.stderr.write(`[FNCSUP] Warning: failed to set FNCPATNAME: ${e.message}\n`);
-    return '';
+    process.stderr.write(`[FNCSUP] FAILED getRows: ${e.message}\n`);
+    await fncsupForm.endCurrentForm(false).catch(() => {});
+    return { original: '', saved: false };
+  }
+
+  if (original === newPatName) {
+    process.stderr.write(`[FNCSUP] already "${newPatName}", no change needed\n`);
+    await fncsupForm.endCurrentForm(false).catch(() => {});
+    return { original, saved: true };
+  }
+
+  try {
+    await withTimeout(new Promise((res, rej) => fncsupForm.setActiveRow(1, res, rej)), 10000, 'setActiveRow');
+    process.stderr.write(`[FNCSUP] setActiveRow OK\n`);
+    await withTimeout(new Promise((res, rej) => fncsupForm.fieldUpdate('FNCPATNAME', newPatName, res, rej)), 10000, 'fieldUpdate');
+    process.stderr.write(`[FNCSUP] fieldUpdate OK\n`);
+    await withTimeout(new Promise((res, rej) => fncsupForm.saveRow(false, res, rej)), 15000, 'saveRow');
+    process.stderr.write(`[FNCSUP] saveRow OK\n`);
+  } catch (e) {
+    process.stderr.write(`[FNCSUP] FAILED during edit/save: ${e.message}\n`);
+    await fncsupForm.endCurrentForm(false).catch(() => {});
+    return { original, saved: false };
+  }
+
+  // אימות: קרא שוב כדי לוודא שהשינוי נשמר
+  try {
+    const rowsAfter = await withTimeout(
+      new Promise((res, rej) => fncsupForm.getRows(1, res, rej)),
+      10000, 'getRows FNCSUP verify'
+    );
+    const rowAfter = (rowsAfter && rowsAfter.FNCSUP)
+      ? (rowsAfter.FNCSUP['1'] || Object.values(rowsAfter.FNCSUP)[0] || {})
+      : {};
+    const actualVal = (rowAfter.FNCPATNAME || '').trim();
+    process.stderr.write(`[FNCSUP] verify after save: FNCPATNAME="${actualVal}"\n`);
+    const saved = (actualVal === newPatName);
+    if (!saved) process.stderr.write(`[FNCSUP] WARNING: save did not persist! still "${actualVal}"\n`);
+    await fncsupForm.endCurrentForm(false).catch(() => {});
+    return { original, saved };
+  } catch (e) {
+    process.stderr.write(`[FNCSUP] verify read failed: ${e.message}\n`);
+    await fncsupForm.endCurrentForm(false).catch(() => {});
+    return { original, saved: false };
   }
 }
 
@@ -252,8 +281,12 @@ async function main() {
   // ===== עדכון FNCSUP לפני פתיחת PINVOICES (רק ב-2/3) =====
   // חשוב: פעולה זו חייבת לקרות לפני פתיחת PINVOICES כדי למנוע קונפליקט ב-WCF
   let _origFncpatname = '';
+  let _fncsupSaved = false;
   if (vatType === 'two_thirds' && supplierCode) {
-    _origFncpatname = await getAndSetSupplierFncpatname(company, supplierCode, '2/3');
+    const fncsupResult = await getAndSetSupplierFncpatname(company, supplierCode, '2/3');
+    _origFncpatname = fncsupResult.original;
+    _fncsupSaved = fncsupResult.saved;
+    process.stderr.write(`[FNCSUP] result: original="${_origFncpatname}" saved=${_fncsupSaved}\n`);
   }
 
   process.stderr.write(`Opening PINVOICES for ${ivnum}...\n`);
@@ -375,9 +408,7 @@ async function main() {
 
   // ===== שחזור FNCPATNAME המקורי אחרי סגירת PINVOICES =====
   if (vatType === 'two_thirds' && supplierCode && _origFncpatname && _origFncpatname !== '2/3') {
-    await getAndSetSupplierFncpatname(company, supplierCode, _origFncpatname).catch(e => {
-      process.stderr.write(`[FNCSUP] Warning: failed to restore FNCPATNAME: ${e.message}\n`);
-    });
+    await getAndSetSupplierFncpatname(company, supplierCode, _origFncpatname);
   }
 
   // צירוף קובץ לתנועת יומן (FNCTRANS) — אחרי CLOSEPRINTPIV יש FNCNUM
@@ -454,9 +485,9 @@ async function main() {
 
   // החשבונית נסגרה אם ה-IVNUM הוא כבר מספר סופי (לא T)
   if (!isTempIvnum(ivnumFinal) && ivnumFinal) {
-    console.log(JSON.stringify({ ok: true, fncnum, ivnum: ivnumFinal }));
+    console.log(JSON.stringify({ ok: true, fncnum, ivnum: ivnumFinal, fncsupSaved: _fncsupSaved }));
   } else {
-    console.log(JSON.stringify({ ok: false, error: `Invoice still has temp IVNUM: ${ivnumFinal || 'none'}. Check server logs.` }));
+    console.log(JSON.stringify({ ok: false, error: `Invoice still has temp IVNUM: ${ivnumFinal || 'none'}. Check server logs.`, fncsupSaved: _fncsupSaved }));
   }
 }
 
