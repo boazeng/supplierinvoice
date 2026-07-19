@@ -208,8 +208,8 @@ async function getAndSetSupplierFncpatname(company, supplierCode, newPatName) {
 
     if (original !== newPatName) {
       await withTimeout(
-        new Promise((res, rej) => fncsupForm.editRow(1, res, rej)),
-        10000, 'editRow FNCSUP'
+        new Promise((res, rej) => fncsupForm.setActiveRow(1, res, rej)),
+        10000, 'setActiveRow FNCSUP'
       );
       await withTimeout(
         new Promise((res, rej) => fncsupForm.fieldUpdate('FNCPATNAME', newPatName, res, rej)),
