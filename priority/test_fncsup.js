@@ -94,20 +94,46 @@ async function main() {
   console.log(`FNCSUP row data: ${JSON.stringify(rowData)}`);
   console.log(`Current FNCPATNAME: "${rowData.FNCPATNAME || '(empty)'}"`);
 
-  // Try setActiveRow + fieldUpdate
-  console.log('Trying setActiveRow(1)...');
-  await withTimeout(
-    new Promise((res, rej) => fncsupForm.setActiveRow(1, res, rej)),
-    10000, 'setActiveRow'
-  ).catch(e => console.log(`setActiveRow failed: ${e.message}`));
-
-  console.log('Trying fieldUpdate FNCPATNAME → TEST_VAL...');
-  await withTimeout(
-    new Promise((res, rej) => fncsupForm.fieldUpdate('FNCPATNAME', rowData.FNCPATNAME || '', res, rej)),
-    10000, 'fieldUpdate (no-op)'
-  ).catch(e => console.log(`fieldUpdate failed: ${e.message}`));
+  // נסה לפתוח subforms של FNCSUP
+  const subformsToTry = ['FNCPATSUP_SUBFORM','FNCSUPPAT_SUBFORM','FNCSUP_SUBFORM','FNCPAT_SUBFORM','SUPPLIERSFNC_SUBFORM'];
+  for (const sfName of subformsToTry) {
+    console.log(`Trying subform: ${sfName}...`);
+    try {
+      const sf = await withTimeout(
+        new Promise((res, rej) => fncsupForm.startSubForm(sfName, makeMessageHandler(sfName), null, res, rej)),
+        10000, `startSubForm ${sfName}`
+      );
+      const sfRows = await withTimeout(new Promise((res, rej) => sf.getRows(1, res, rej)), 10000, 'getRows sf');
+      console.log(`${sfName} rows: ${JSON.stringify(sfRows)}`);
+      await sf.endCurrentForm(false).catch(() => {});
+    } catch(e) {
+      console.log(`${sfName} failed: ${e.message}`);
+    }
+  }
 
   await fncsupForm.endCurrentForm(false).catch(() => {});
+
+  // נסה גם SUPPLIERS form
+  console.log('\n--- Trying SUPPLIERS form ---');
+  try {
+    const supForm = await withTimeout(
+      new Promise((res, rej) => priority.formStartEx(
+        'SUPPLIERS', makeMessageHandler('SUPPLIERS'), null,
+        company, 1, { zoomValue: supplierCode }, res, rej
+      )),
+      30000, 'formStartEx SUPPLIERS'
+    );
+    console.log('SUPPLIERS form opened');
+    const supRows = await withTimeout(new Promise((res, rej) => supForm.getRows(1, res, rej)), 15000, 'getRows SUPPLIERS');
+    const supRow = (supRows && supRows.SUPPLIERS) ? (supRows.SUPPLIERS['1'] || Object.values(supRows.SUPPLIERS)[0] || {}) : {};
+    const fncField = supRow.FNCPATNAME;
+    console.log(`SUPPLIERS FNCPATNAME: "${fncField === undefined ? 'NOT FOUND' : fncField}"`);
+    console.log(`SUPPLIERS keys with FNC: ${Object.keys(supRow).filter(k => k.includes('FNC')).join(', ') || 'none'}`);
+    await supForm.endCurrentForm(false).catch(() => {});
+  } catch(e) {
+    console.log(`SUPPLIERS form failed: ${e.message}`);
+  }
+
   console.log('Done');
 }
 
