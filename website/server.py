@@ -146,6 +146,35 @@ async def debug_finalize(ivnum: str):
         return {"error": str(e)}
 
 
+@app.get("/api/debug/test-fncsup/{supplier_code}")
+async def debug_test_fncsup(supplier_code: str):
+    """מריץ test_fncsup.js ומחזיר stdout+stderr — לבדיקת גישה ל-FNCSUP דרך WCF."""
+    import asyncio, shutil
+    for cmd in ["node", "nodejs"]:
+        if shutil.which(cmd):
+            node_cmd = cmd
+            break
+    else:
+        return {"error": "node not found"}
+    js_script = BASE_DIR / "priority" / "test_fncsup.js"
+    if not js_script.exists():
+        return {"error": "test_fncsup.js not found"}
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            node_cmd, str(js_script), supplier_code,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            cwd=str(BASE_DIR / "priority"),
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
+        return {
+            "stdout": stdout.decode(errors="replace"),
+            "stderr": stderr.decode(errors="replace"),
+            "returncode": proc.returncode,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/api/debug/close_odata/{ivnum}")
 async def debug_close_odata(ivnum: str):
     """נסה לסגור חשבונית דרך OData bound action — ללא WCF."""
