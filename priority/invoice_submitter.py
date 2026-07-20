@@ -232,6 +232,12 @@ async def _finalize_in_priority(
             invoice.status               = InvoiceStatus.PENDING_FILING
             invoice.error_message        = ""
             logger.info("CLOSEPRINTPIV הצליח — IVNUM: %s, FNCNUM: %s", final_ivnum, fncnum)
+            if vat_type == 'two_thirds' and fncnum:
+                try:
+                    await priority_client._patch(f"FNCTRANS(FNCNUM={fncnum})", {"FNCPATNAME": "2/3"})
+                    logger.info("עדכון FNCTRANS(%s).FNCPATNAME='2/3' הצליח", fncnum)
+                except Exception as _e:
+                    logger.warning("עדכון FNCTRANS FNCPATNAME נכשל: %s", _e)
             if invoice.file_path:
                 await _attach_invoice_file(priority_client, final_ivnum, invoice.file_path, debit)
             await _attach_receipt_documents(priority_client, final_ivnum, receipt_docs, debit)
