@@ -113,8 +113,8 @@ async function main() {
 
   await fncsupForm.endCurrentForm(false).catch(() => {});
 
-  // נסה גם SUPPLIERS form
-  console.log('\n--- Trying SUPPLIERS form ---');
+  // נסה גם SUPPLIERS form + subforms שלה
+  console.log('\n--- Trying SUPPLIERS form + subforms ---');
   try {
     const supForm = await withTimeout(
       new Promise((res, rej) => priority.formStartEx(
@@ -126,9 +126,25 @@ async function main() {
     console.log('SUPPLIERS form opened');
     const supRows = await withTimeout(new Promise((res, rej) => supForm.getRows(1, res, rej)), 15000, 'getRows SUPPLIERS');
     const supRow = (supRows && supRows.SUPPLIERS) ? (supRows.SUPPLIERS['1'] || Object.values(supRows.SUPPLIERS)[0] || {}) : {};
-    const fncField = supRow.FNCPATNAME;
-    console.log(`SUPPLIERS FNCPATNAME: "${fncField === undefined ? 'NOT FOUND' : fncField}"`);
-    console.log(`SUPPLIERS keys with FNC: ${Object.keys(supRow).filter(k => k.includes('FNC')).join(', ') || 'none'}`);
+    console.log(`SUPPLIERS keys with FNC: ${Object.keys(supRow).filter(k => k.toUpperCase().includes('FNC')).join(', ') || 'none'}`);
+
+    // נסה subforms של SUPPLIERS שעשויות להכיל FNCPATNAME
+    const suppSubforms = ['FNCSUP_SUBFORM','SUPPLIERSA_SUBFORM','SUPPLIERSFNC_SUBFORM','FNCSUPPAT','SUPFNC_SUBFORM'];
+    for (const sfName of suppSubforms) {
+      console.log(`  Trying SUPPLIERS subform: ${sfName}...`);
+      try {
+        const sf = await withTimeout(
+          new Promise((res, rej) => supForm.startSubForm(sfName, makeMessageHandler(sfName), null, res, rej)),
+          10000, `startSubForm ${sfName}`
+        );
+        const sfRows = await withTimeout(new Promise((res, rej) => sf.getRows(1, res, rej)), 10000, 'getRows sf');
+        const sfData = sfRows ? JSON.stringify(sfRows).substring(0, 500) : 'empty';
+        console.log(`  ${sfName} data: ${sfData}`);
+        await sf.endCurrentForm(false).catch(() => {});
+      } catch(e) {
+        console.log(`  ${sfName} failed: ${e.message}`);
+      }
+    }
     await supForm.endCurrentForm(false).catch(() => {});
   } catch(e) {
     console.log(`SUPPLIERS form failed: ${e.message}`);
