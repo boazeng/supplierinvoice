@@ -411,9 +411,11 @@ async function main() {
     await getAndSetSupplierFncpatname(company, supplierCode, _origFncpatname);
   }
 
-  // צירוף קובץ לתנועת יומן (FNCTRANS) — אחרי CLOSEPRINTPIV יש FNCNUM
-  if (filePath && fs.existsSync(filePath) && fncnum && !isTempIvnum(ivnumFinal)) {
-    process.stderr.write(`Attaching file to FNCTRANS ${fncnum}...\n`);
+  // צירוף קובץ + עדכון FNCPATNAME לתנועת יומן (FNCTRANS) — אחרי CLOSEPRINTPIV יש FNCNUM
+  const needFnctrans = (filePath && fs.existsSync(filePath) && fncnum && !isTempIvnum(ivnumFinal))
+                     || (vatType === 'two_thirds' && fncnum && !isTempIvnum(ivnumFinal));
+  if (needFnctrans) {
+    process.stderr.write(`Opening FNCTRANS ${fncnum} (file=${!!filePath} vatType=${vatType})...\n`);
     try {
       const journalForm = await withTimeout(
         new Promise((res, rej) => priority.formStartEx(
@@ -424,26 +426,45 @@ async function main() {
         )),
         30000, 'formStartEx FNCTRANS'
       );
-      const jSub = await withTimeout(
-        new Promise((res, rej) => journalForm.startSubForm(
-          'EXTFILES', makeMessageHandler('FNCTRANS.EXTFILES'), null, res, rej
-        )),
-        20000, 'startSubForm FNCTRANS.EXTFILES'
-      );
-      await withTimeout(new Promise((res, rej) => jSub.newRow(res, rej)), 10000, 'newRow FNCTRANS');
-      const jExt  = path.extname(filePath).toLowerCase().replace('.', '');
-      const jMime = jExt === 'pdf' ? 'application/pdf' : `image/${jExt}`;
-      const jData = `data:${jMime};base64,` + fs.readFileSync(filePath).toString('base64');
-      await withTimeout(
-        new Promise((res, rej) => jSub.uploadDataUrl(jData, jExt, () => {}, res, rej)),
-        60000, 'uploadDataUrl FNCTRANS'
-      );
-      await withTimeout(new Promise((res, rej) => jSub.saveRow(false, res, rej)), 15000, 'saveRow FNCTRANS');
-      await withTimeout(new Promise((res, rej) => jSub.endCurrentForm(false, res, rej)), 15000, 'endSubForm FNCTRANS');
+
+      // ===== עדכון FNCPATNAME ל-'2/3' ישירות על FNCTRANS =====
+      if (vatType === 'two_thirds') {
+        try {
+          const fncTransRows = await withTimeout(new Promise((res, rej) => journalForm.getRows(1, res, rej)), 10000, 'getRows FNCTRANS');
+          const fncTransRow = (fncTransRows && fncTransRows.FNCTRANS) ? (fncTransRows.FNCTRANS['1'] || Object.values(fncTransRows.FNCTRANS)[0] || {}) : {};
+          process.stderr.write(`[FNCTRANS] current FNCPATNAME="${fncTransRow.FNCPATNAME || '(empty)'}" all_keys=${Object.keys(fncTransRow).join(',')}\n`);
+          await withTimeout(new Promise((res, rej) => journalForm.setActiveRow(1, res, rej)), 10000, 'setActiveRow FNCTRANS');
+          await withTimeout(new Promise((res, rej) => journalForm.fieldUpdate('FNCPATNAME', '2/3', res, rej)), 10000, 'fieldUpdate FNCTRANS.FNCPATNAME');
+          await withTimeout(new Promise((res, rej) => journalForm.saveRow(false, res, rej)), 15000, 'saveRow FNCTRANS.FNCPATNAME');
+          process.stderr.write(`[FNCTRANS] FNCPATNAME update saved\n`);
+        } catch(e) {
+          process.stderr.write(`[FNCTRANS] FNCPATNAME update failed (continuing): ${e.message}\n`);
+        }
+      }
+
+      if (filePath && fs.existsSync(filePath)) {
+        const jSub = await withTimeout(
+          new Promise((res, rej) => journalForm.startSubForm(
+            'EXTFILES', makeMessageHandler('FNCTRANS.EXTFILES'), null, res, rej
+          )),
+          20000, 'startSubForm FNCTRANS.EXTFILES'
+        );
+        await withTimeout(new Promise((res, rej) => jSub.newRow(res, rej)), 10000, 'newRow FNCTRANS');
+        const jExt  = path.extname(filePath).toLowerCase().replace('.', '');
+        const jMime = jExt === 'pdf' ? 'application/pdf' : `image/${jExt}`;
+        const jData = `data:${jMime};base64,` + fs.readFileSync(filePath).toString('base64');
+        await withTimeout(
+          new Promise((res, rej) => jSub.uploadDataUrl(jData, jExt, () => {}, res, rej)),
+          60000, 'uploadDataUrl FNCTRANS'
+        );
+        await withTimeout(new Promise((res, rej) => jSub.saveRow(false, res, rej)), 15000, 'saveRow FNCTRANS');
+        await withTimeout(new Promise((res, rej) => jSub.endCurrentForm(false, res, rej)), 15000, 'endSubForm FNCTRANS');
+        process.stderr.write(`File attached to FNCTRANS ${fncnum}\n`);
+      }
+
       await withTimeout(new Promise((res, rej) => journalForm.endCurrentForm(false, res, rej)), 15000, 'endForm FNCTRANS');
-      process.stderr.write(`File attached to FNCTRANS ${fncnum}\n`);
     } catch (e) {
-      process.stderr.write(`FNCTRANS EXTFILES attach failed (continuing): ${e.message}\n`);
+      process.stderr.write(`FNCTRANS section failed (continuing): ${e.message}\n`);
     }
   }
 
