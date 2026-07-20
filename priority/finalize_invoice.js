@@ -267,6 +267,7 @@ async function main() {
   const odataUrl = process.env.PRIORITY_URL_REAL || '';
   const { serviceUrl, tabulaini, company } = parseOdataUrl(odataUrl);
 
+  process.stderr.write(`ARGS: ivnum="${ivnum}" supplierCode="${supplierCode}" vatType="${vatType}"\n`);
   process.stderr.write(`Login → ${serviceUrl} (${company})\n`);
   await withTimeout(
     new Promise((res, rej) => priority.login(
