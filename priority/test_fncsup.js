@@ -81,6 +81,19 @@ async function main() {
     process.exit(1);
   }
 
+  // הדפס את כל שמות העמודות המוגדרות ב-FNCSUP WCF (לפני getRows)
+  try {
+    const curTab = fncsupForm.curTab;
+    if (curTab && curTab.FormColumns && curTab.FormColumns.stringMap && curTab.FormColumns.stringMap.backingMap) {
+      const cols = Object.keys(curTab.FormColumns.stringMap.backingMap);
+      console.log(`FNCSUP WCF columns (${cols.length}): ${cols.join(', ')}`);
+    } else {
+      console.log(`FNCSUP curTab structure: ${JSON.stringify(Object.keys(fncsupForm.curTab || {}))}`);
+    }
+  } catch(e) {
+    console.log(`Column dump failed: ${e.message}`);
+  }
+
   const rows = await withTimeout(
     new Promise((res, rej) => fncsupForm.getRows(1, res, rej)),
     15000, 'getRows FNCSUP'
