@@ -88,23 +88,47 @@ async function main() {
 
   if (!rows) { process.exit(1); }
 
+  const allRowKeys = rows.FNCSUP ? Object.keys(rows.FNCSUP) : [];
+  console.log(`FNCSUP row keys: ${JSON.stringify(allRowKeys)}`);
   const rowData = (rows && rows.FNCSUP)
     ? (rows.FNCSUP['1'] || Object.values(rows.FNCSUP)[0] || {})
     : {};
-  console.log(`FNCSUP row data: ${JSON.stringify(rowData)}`);
-  console.log(`Current FNCPATNAME: "${rowData.FNCPATNAME || '(empty)'}"`);
+  console.log(`FNCSUP ALL fields: ${JSON.stringify(rowData)}`);
+  console.log(`Current FNCPATNAME: "${rowData.FNCPATNAME === undefined ? 'FIELD NOT IN ROW' : rowData.FNCPATNAME}"`);
+
+  // נסה לכתוב FNCPATNAME ל-FNCSUP
+  console.log('\n--- Trying to WRITE FNCPATNAME to FNCSUP ---');
+  try {
+    await withTimeout(new Promise((res, rej) => fncsupForm.setActiveRow(1, res, rej)), 10000, 'setActiveRow FNCSUP');
+    console.log('setActiveRow OK');
+    await withTimeout(new Promise((res, rej) => fncsupForm.fieldUpdate('FNCPATNAME', '2/3', res, rej)), 10000, 'fieldUpdate FNCPATNAME');
+    console.log('fieldUpdate FNCPATNAME OK');
+    await withTimeout(new Promise((res, rej) => fncsupForm.saveRow(false, res, rej)), 15000, 'saveRow FNCSUP');
+    console.log('saveRow OK');
+    // קרא שוב כדי לאמת
+    const rowsAfter = await withTimeout(new Promise((res, rej) => fncsupForm.getRows(1, res, rej)), 10000, 'getRows after write');
+    const rowAfter = rowsAfter && rowsAfter.FNCSUP ? (rowsAfter.FNCSUP['1'] || Object.values(rowsAfter.FNCSUP)[0] || {}) : {};
+    console.log(`FNCSUP FNCPATNAME after save: "${rowAfter.FNCPATNAME === undefined ? 'NOT IN ROW' : rowAfter.FNCPATNAME}"`);
+    // שחזר לערך המקורי
+    const origVal = rowData.FNCPATNAME || 'חסמ';
+    await withTimeout(new Promise((res, rej) => fncsupForm.fieldUpdate('FNCPATNAME', origVal, res, rej)), 10000, 'restore fieldUpdate');
+    await withTimeout(new Promise((res, rej) => fncsupForm.saveRow(false, res, rej)), 15000, 'restore saveRow');
+    console.log(`Restored to "${origVal}"`);
+  } catch(e) {
+    console.log(`Write FNCPATNAME failed: ${e.message}`);
+  }
 
   // נסה לפתוח subforms של FNCSUP
   const subformsToTry = ['FNCPATSUP_SUBFORM','FNCSUPPAT_SUBFORM','FNCSUP_SUBFORM','FNCPAT_SUBFORM','SUPPLIERSFNC_SUBFORM'];
   for (const sfName of subformsToTry) {
-    console.log(`Trying subform: ${sfName}...`);
+    console.log(`\nTrying subform: ${sfName}...`);
     try {
       const sf = await withTimeout(
         new Promise((res, rej) => fncsupForm.startSubForm(sfName, makeMessageHandler(sfName), null, res, rej)),
         10000, `startSubForm ${sfName}`
       );
       const sfRows = await withTimeout(new Promise((res, rej) => sf.getRows(1, res, rej)), 10000, 'getRows sf');
-      console.log(`${sfName} rows: ${JSON.stringify(sfRows)}`);
+      console.log(`${sfName} data: ${JSON.stringify(sfRows).substring(0, 600)}`);
       await sf.endCurrentForm(false).catch(() => {});
     } catch(e) {
       console.log(`${sfName} failed: ${e.message}`);
